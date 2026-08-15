@@ -14,6 +14,7 @@ class TenderEligibilitySchema(BaseModel):
     minimum_annual_turnover: Optional[float] = Field(default=None, description="Minimum annual turnover in INR (hardcoded mandatory field).")
     minimum_experience_years: Optional[int] = Field(default=None, description="Minimum years of bus operating experience (hardcoded mandatory field).")
     minimum_past_contract_value: Optional[float] = Field(default=None, description="Minimum single past contract value in INR (hardcoded mandatory field).")
+    minimum_depots_required: Optional[int] = Field(default=None, description="Minimum number of bus depots required.")
     required_geographies: List[str] = Field(default_factory=list, description="Required state or city geographies.")
     other_requirements: List[OtherRequirementItem] = Field(default_factory=list, description="Other eligibility requirements with explicit is_mandatory flag.")
 

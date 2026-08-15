@@ -92,6 +92,42 @@ async def list_tenders(
     return TenderListResponse(total=len(filtered), tenders=filtered)
 
 
+@router.get("/daily-digest")
+async def get_daily_digest(db: Session = Depends(get_db)):
+    tenders = db.query(Tender).order_by(Tender.submission_deadline.asc()).all()
+    formatted = [format_tender_response(t) for t in tenders]
+
+    go_tenders = [t for t in formatted if t.screening and t.screening.verdict == "GO"]
+    review_tenders = [t for t in formatted if t.screening and t.screening.verdict == "REVIEW"]
+
+    total_buses = sum((t.latest_bus_quantity or t.original_bus_quantity or 0) for t in tenders)
+    
+    digest_text = f"# 📱 Tender Intelligence Daily Digest ({datetime.now(timezone.utc).strftime('%d %b %Y')})\n\n"
+    digest_text += f"**Active Tenders Tracked:** {len(tenders)} opportunities | **Total Scope:** {total_buses:,} buses\n"
+    digest_text += f"**Priority Actions:** {len(go_tenders)} GO | {len(review_tenders)} REVIEW\n\n"
+
+    digest_text += "## 🚀 Recommended Opportunities (GO)\n"
+    if go_tenders:
+        for t in go_tenders[:5]:
+            emd_str = f"INR {t.emd_amount:,.0f}" if t.emd_amount else "N/A"
+            digest_text += f"- **{t.title[:60]}...**\n  - *Authority:* {t.issuing_authority} ({t.state or 'Pan-India'})\n  - *Deadline:* {t.submission_deadline[:10]} ({t.days_remaining} days left)\n  - *EMD:* {emd_str}\n\n"
+    else:
+        digest_text += "_No immediate GO tenders match current profile._\n\n"
+
+    digest_text += "## ⚠️ Manual Review Required (REVIEW)\n"
+    if review_tenders:
+        for t in review_tenders[:5]:
+            digest_text += f"- **{t.title[:60]}...**\n  - *Authority:* {t.issuing_authority}\n  - *Reasoning:* {t.screening.reasoning[:100]}...\n\n"
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "total_active_tenders": len(tenders),
+        "go_count": len(go_tenders),
+        "review_count": len(review_tenders),
+        "digest_markdown": digest_text
+    }
+
+
 @router.get("/{tender_id}", response_model=TenderResponse)
 async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
     t = db.query(Tender).filter(Tender.id == tender_id).first()

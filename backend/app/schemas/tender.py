@@ -7,6 +7,7 @@ class TenderEligibilityResponse(BaseModel):
     minimum_annual_turnover: Optional[float] = None
     minimum_experience_years: Optional[int] = None
     minimum_past_contract_value: Optional[float] = None
+    minimum_depots_required: Optional[int] = None
     required_geographies: Optional[List[str]] = None
     other_requirements: Optional[List[Dict[str, Any]]] = None
 

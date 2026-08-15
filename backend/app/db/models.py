@@ -85,6 +85,7 @@ class TenderEligibility(Base):
     minimum_annual_turnover = Column(Numeric(15, 2), nullable=True)
     minimum_experience_years = Column(Integer, nullable=True)
     minimum_past_contract_value = Column(Numeric(15, 2), nullable=True)
+    minimum_depots_required = Column(Integer, nullable=True)
     required_geographies = Column(JSONB, nullable=True)
     # other_requirements contains items with explicit is_mandatory: bool
     other_requirements = Column(JSONB, nullable=True)
