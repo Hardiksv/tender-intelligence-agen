@@ -1,0 +1,160 @@
+from datetime import datetime, timezone
+from typing import Dict, Any, List
+
+from app.schemas.profile import CompanyProfileBase
+from app.schemas.extraction import TenderEligibilitySchema
+from app.schemas.screening import CriterionDetail, CriterionVerdict, FinalVerdict, ScreeningResultSchema
+from app.core.logging import log_action
+
+
+def screen_tender_eligibility(
+    tender_id: str,
+    tender_title: str,
+    tender_state: str,
+    eligibility: TenderEligibilitySchema,
+    profile: CompanyProfileBase
+) -> ScreeningResultSchema:
+    """
+    Deterministically screens tender eligibility against company profile using pure Python comparisons.
+    Enforces strict verdict precedence: NO-GO > REVIEW > GO.
+    """
+    criteria: List[CriterionDetail] = []
+
+    # 1. Fleet Size Check (Mandatory)
+    if eligibility.minimum_fleet_size is not None and eligibility.minimum_fleet_size > 0:
+        if profile.fleet_size >= eligibility.minimum_fleet_size:
+            v = CriterionVerdict.PASS
+            reason = f"Company fleet size ({profile.fleet_size}) meets or exceeds required ({eligibility.minimum_fleet_size})."
+        else:
+            v = CriterionVerdict.FAIL
+            reason = f"Company fleet size ({profile.fleet_size}) is below required minimum ({eligibility.minimum_fleet_size})."
+        
+        criteria.append(CriterionDetail(
+            criterion_name="Minimum Fleet Size",
+            is_mandatory=True,
+            verdict=v,
+            company_value=profile.fleet_size,
+            required_value=eligibility.minimum_fleet_size,
+            reason=reason
+        ))
+
+    # 2. Annual Turnover Check (Mandatory)
+    if eligibility.minimum_annual_turnover is not None and eligibility.minimum_annual_turnover > 0:
+        if profile.annual_turnover >= eligibility.minimum_annual_turnover:
+            v = CriterionVerdict.PASS
+            reason = f"Company turnover (₹{profile.annual_turnover/1e7:.2f} Cr) meets or exceeds required (₹{eligibility.minimum_annual_turnover/1e7:.2f} Cr)."
+        else:
+            v = CriterionVerdict.FAIL
+            reason = f"Company turnover (₹{profile.annual_turnover/1e7:.2f} Cr) is below required minimum (₹{eligibility.minimum_annual_turnover/1e7:.2f} Cr)."
+        
+        criteria.append(CriterionDetail(
+            criterion_name="Minimum Annual Turnover",
+            is_mandatory=True,
+            verdict=v,
+            company_value=f"₹{profile.annual_turnover/1e7:.2f} Cr",
+            required_value=f"₹{eligibility.minimum_annual_turnover/1e7:.2f} Cr",
+            reason=reason
+        ))
+
+    # 3. Operating Experience Check (Mandatory)
+    if eligibility.minimum_experience_years is not None and eligibility.minimum_experience_years > 0:
+        if profile.years_experience >= eligibility.minimum_experience_years:
+            v = CriterionVerdict.PASS
+            reason = f"Company experience ({profile.years_experience} years) meets or exceeds required ({eligibility.minimum_experience_years} years)."
+        else:
+            v = CriterionVerdict.FAIL
+            reason = f"Company experience ({profile.years_experience} years) is below required minimum ({eligibility.minimum_experience_years} years)."
+        
+        criteria.append(CriterionDetail(
+            criterion_name="Years of Experience",
+            is_mandatory=True,
+            verdict=v,
+            company_value=f"{profile.years_experience} years",
+            required_value=f"{eligibility.minimum_experience_years} years",
+            reason=reason
+        ))
+
+    # 4. Past Contract Value Check (Mandatory)
+    if eligibility.minimum_past_contract_value is not None and eligibility.minimum_past_contract_value > 0:
+        max_company_contract = max(profile.past_contract_sizes) if profile.past_contract_sizes else 0.0
+        if max_company_contract >= eligibility.minimum_past_contract_value:
+            v = CriterionVerdict.PASS
+            reason = f"Largest executed contract (₹{max_company_contract/1e7:.2f} Cr) meets required minimum (₹{eligibility.minimum_past_contract_value/1e7:.2f} Cr)."
+        else:
+            v = CriterionVerdict.FAIL
+            reason = f"Largest executed contract (₹{max_company_contract/1e7:.2f} Cr) is below required minimum (₹{eligibility.minimum_past_contract_value/1e7:.2f} Cr)."
+        
+        criteria.append(CriterionDetail(
+            criterion_name="Minimum Past Contract Value",
+            is_mandatory=True,
+            verdict=v,
+            company_value=f"₹{max_company_contract/1e7:.2f} Cr",
+            required_value=f"₹{eligibility.minimum_past_contract_value/1e7:.2f} Cr",
+            reason=reason
+        ))
+
+    # 5. Geography Preference Check (Non-mandatory)
+    if tender_state:
+        if tender_state.lower() in [g.lower() for g in profile.preferred_geographies]:
+            v = CriterionVerdict.PASS
+            reason = f"Tender state '{tender_state}' is listed in company preferred geographies."
+        else:
+            v = CriterionVerdict.REVIEW
+            reason = f"Tender state '{tender_state}' is not in preferred geographies ({profile.preferred_geographies}). Requires strategic review."
+        
+        criteria.append(CriterionDetail(
+            criterion_name="Preferred Geography",
+            is_mandatory=False,
+            verdict=v,
+            company_value=profile.preferred_geographies,
+            required_value=tender_state,
+            reason=reason
+        ))
+
+    # 6. Other Requirements Check
+    if eligibility.other_requirements:
+        for req in eligibility.other_requirements:
+            criteria.append(CriterionDetail(
+                criterion_name="Special Tender Requirement",
+                is_mandatory=req.is_mandatory,
+                verdict=CriterionVerdict.REVIEW,
+                company_value="Under Review",
+                required_value=req.requirement_text,
+                reason=f"Qualitative requirement clause: '{req.requirement_text}'. Flagged for manual review."
+            ))
+
+    # ENFORCE VERDICT PRECEDENCE: NO-GO > REVIEW > GO
+    has_mandatory_failure = any(c.verdict == CriterionVerdict.FAIL and c.is_mandatory for c in criteria)
+    has_any_review = any(c.verdict == CriterionVerdict.REVIEW for c in criteria)
+
+    if has_mandatory_failure:
+        final_verdict = FinalVerdict.NO_GO
+        summary = "NO-GO: One or more mandatory eligibility requirements were not met by the company profile."
+    elif has_any_review:
+        final_verdict = FinalVerdict.REVIEW
+        summary = "REVIEW: All mandatory numeric thresholds passed, but specific non-mandatory or qualitative clauses require manual review."
+    else:
+        final_verdict = FinalVerdict.GO
+        summary = "GO: All mandatory and optional eligibility criteria fully satisfied."
+
+    result = ScreeningResultSchema(
+        tender_id=str(tender_id),
+        verdict=final_verdict,
+        reasoning=summary,
+        criteria_results=criteria,
+        screened_at=datetime.now(timezone.utc).isoformat()
+    )
+
+    log_action(
+        "SCREENING_COMPLETED",
+        tender_id=tender_id,
+        status="SUCCESS",
+        details={
+            "tender_title": tender_title[:40],
+            "verdict": final_verdict.value,
+            "has_mandatory_fail": has_mandatory_failure,
+            "criteria_count": len(criteria)
+        }
+    )
+
+    return result
