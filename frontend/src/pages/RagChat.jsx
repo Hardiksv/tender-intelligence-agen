@@ -75,7 +75,7 @@ export default function RagChat() {
             onClick={() => handleSend(sq)}
             className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/40 text-xs text-indigo-300 hover:text-white transition-all text-left"
           >
-            💬 "{sq}"
+            "{sq}"
           </button>
         ))}
       </div>

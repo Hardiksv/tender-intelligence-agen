@@ -1,21 +1,25 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
 import os
+from typing import Optional
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """
+    Application Settings dynamically loaded from .env environment file.
+    No hardcoded production settings reside in code.
+    """
     # Database Settings
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/tender_db"
-    TEST_DATABASE_URL: str = "postgresql://test:test@localhost:5432/tender_test"
+    DATABASE_URL: str
+    TEST_DATABASE_URL: Optional[str] = None
 
     # LLM Settings (LiteLLM)
-    LLM_API_KEY: str = "mock_key_for_testing"
+    LLM_API_KEY: str
     LLM_MODEL: str = "gemini/gemini-2.5-flash"
     LLM_FALLBACK_MODEL: str = "gemini/gemini-2.5-pro"
 
     # Embeddings Settings
-    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
-    EMBEDDING_DIMENSION: int = 384
+    EMBEDDING_MODEL: str = "gemini/text-embedding-004"
+    EMBEDDING_DIMENSION: int = 768
 
     # Application Settings
     TIMEZONE: str = "Asia/Kolkata"
@@ -28,7 +32,7 @@ class Settings(BaseSettings):
     DISCOVERY_INTERVAL_MINUTES: int = 60
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "../.env", "../../.env"),
         env_file_encoding="utf-8",
         extra="ignore"
     )

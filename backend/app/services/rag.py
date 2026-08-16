@@ -9,7 +9,7 @@ from app.services.retrieval import retrieve_relevant_context
 
 PROMPT_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "prompts", "rag.txt"
+    "prompts", "rag.md"
 )
 
 

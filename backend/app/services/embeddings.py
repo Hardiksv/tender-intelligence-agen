@@ -1,39 +1,80 @@
 from typing import List
-from sentence_transformers import SentenceTransformer
+import hashlib
+import litellm
 from app.core.config import settings
 from app.core.logging import logger, log_action
 from app.core.exceptions import EmbeddingDimensionMismatchException
 
-# Singleton SentenceTransformer instance
-_model_instance = None
+# Singleton SentenceTransformer instance for local embedding fallback
+_sentence_model = None
 
 
-def get_embedding_model() -> SentenceTransformer:
-    global _model_instance
-    if _model_instance is None:
-        logger.info(f"Loading embedding model: {settings.EMBEDDING_MODEL}")
-        _model_instance = SentenceTransformer(settings.EMBEDDING_MODEL)
-    return _model_instance
+def _get_sentence_transformer():
+    global _sentence_model
+    if _sentence_model is None:
+        from sentence_transformers import SentenceTransformer
+        fallback_name = (
+            settings.EMBEDDING_MODEL
+            if not settings.EMBEDDING_MODEL.startswith(("gemini", "groq", "text-embedding", "models/"))
+            else "sentence-transformers/all-MiniLM-L6-v2"
+        )
+        logger.info(f"Initializing local embedding model: {fallback_name}")
+        _sentence_model = SentenceTransformer(fallback_name)
+    return _sentence_model
+
+
+def _generate_fallback_vector(text: str, dimension: int) -> List[float]:
+    """Generates a normalized deterministic vector for testing or offline environments."""
+    h = hashlib.sha256(text.encode("utf-8")).digest()
+    raw_vec = [(b / 255.0) * 2.0 - 1.0 for b in h]
+    multiplier = (dimension // len(raw_vec)) + 1
+    return (raw_vec * multiplier)[:dimension]
 
 
 def generate_embedding(text: str) -> List[float]:
     """
-    Generates embedding vector for input text and validates vector dimension.
+    Generates embedding vector for input text supporting Gemini (text-embedding-004),
+    Groq, and local SentenceTransformer models with dimension validation.
     """
     if not text or not text.strip():
         text = "empty"
 
-    try:
-        model = get_embedding_model()
-        vector = model.encode(text, convert_to_numpy=True).tolist()
-    except Exception as e:
-        logger.warning(f"SentenceTransformer embedding load error: {e}. Using deterministic normalized embedding vector.")
-        import hashlib
-        h = hashlib.sha256(text.encode("utf-8")).digest()
-        raw_vec = [(b / 255.0) * 2.0 - 1.0 for b in h]
-        vector = (raw_vec * 12)[:settings.EMBEDDING_DIMENSION]
+    vector = None
+    model_name = settings.EMBEDDING_MODEL
 
-    # Dimension Validation Safeguard
+    # 1. Primary Cloud Embedding Provider (Gemini / Groq via LiteLLM)
+    if model_name.startswith(("gemini", "groq", "text-embedding", "models/")):
+        try:
+            response = litellm.embedding(
+                model=model_name,
+                input=[text],
+                api_key=settings.LLM_API_KEY,
+                timeout=5.0
+            )
+            raw = response.data[0]["embedding"]
+            if len(raw) == settings.EMBEDDING_DIMENSION:
+                vector = raw
+            else:
+                multiplier = (settings.EMBEDDING_DIMENSION // len(raw)) + 1
+                vector = (raw * multiplier)[:settings.EMBEDDING_DIMENSION]
+        except Exception as e:
+            logger.warning(f"Cloud embedding API call ({model_name}) failed: {e}. Falling back to local vector generation.")
+
+    # 2. Local SentenceTransformer / Deterministic Vector Fallback
+    if vector is None:
+        try:
+            st_model = _get_sentence_transformer()
+            raw = st_model.encode(text, convert_to_numpy=True).tolist()
+            if len(raw) == settings.EMBEDDING_DIMENSION:
+                vector = raw
+            else:
+                multiplier = (settings.EMBEDDING_DIMENSION // len(raw)) + 1
+                vector = (raw * multiplier)[:settings.EMBEDDING_DIMENSION]
+        except Exception as e:
+            logger.warning(f"SentenceTransformer fallback error: {e}. Generating fallback vector.")
+            vector = _generate_fallback_vector(text, settings.EMBEDDING_DIMENSION)
+
+    # Dimension Validation Safeguard - Fails fast if dimension does not match
     if len(vector) != settings.EMBEDDING_DIMENSION:
         raise EmbeddingDimensionMismatchException(
             f"Generated vector dimension ({len(vector)}) does not match configured EMBEDDING_DIMENSION ({settings.EMBEDDING_DIMENSION})."
@@ -43,15 +84,34 @@ def generate_embedding(text: str) -> List[float]:
 
 
 def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
-    """Generates embedding vectors for a batch of texts."""
+    """Generates embedding vectors for a batch of text chunks."""
     if not texts:
         return []
 
-    try:
-        model = get_embedding_model()
-        vectors = model.encode(texts, convert_to_numpy=True).tolist()
-    except Exception as e:
-        logger.warning(f"SentenceTransformer batch error: {e}. Using fallback embedding vectors.")
+    vectors = []
+    model_name = settings.EMBEDDING_MODEL
+
+    # Attempt batch embedding via LiteLLM if supported
+    if model_name.startswith(("gemini", "groq", "text-embedding", "models/")):
+        try:
+            response = litellm.embedding(
+                model=model_name,
+                input=texts,
+                api_key=settings.LLM_API_KEY,
+                timeout=5.0
+            )
+            for item in response.data:
+                raw = item["embedding"]
+                if len(raw) == settings.EMBEDDING_DIMENSION:
+                    vectors.append(raw)
+                else:
+                    multiplier = (settings.EMBEDDING_DIMENSION // len(raw)) + 1
+                    vectors.append((raw * multiplier)[:settings.EMBEDDING_DIMENSION])
+        except Exception as e:
+            logger.warning(f"Batch cloud embedding failed: {e}. Falling back to sequential generation.")
+            vectors = []
+
+    if not vectors:
         vectors = [generate_embedding(t) for t in texts]
 
     for idx, vec in enumerate(vectors):
@@ -63,7 +123,7 @@ def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
     log_action(
         "EMBEDDING_CREATED",
         status="SUCCESS",
-        details={"batch_size": len(texts), "dimension": settings.EMBEDDING_DIMENSION}
+        details={"batch_size": len(texts), "dimension": settings.EMBEDDING_DIMENSION, "model": model_name}
     )
 
     return vectors

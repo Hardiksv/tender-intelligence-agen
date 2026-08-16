@@ -9,7 +9,7 @@ from app.services.normalization import normalize_currency_to_inr, normalize_flee
 
 PROMPT_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "prompts", "extraction.txt"
+    "prompts", "extraction.md"
 )
 
 

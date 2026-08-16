@@ -106,11 +106,11 @@ async def get_daily_digest(db: Session = Depends(get_db)):
 
     total_buses = sum((t.latest_bus_quantity or t.original_bus_quantity or 0) for t in tenders)
     
-    digest_text = f"# 📱 Tender Intelligence Daily Digest ({datetime.now(timezone.utc).strftime('%d %b %Y')})\n\n"
+    digest_text = f"# Tender Intelligence Daily Digest ({datetime.now(timezone.utc).strftime('%d %b %Y')})\n\n"
     digest_text += f"**Active Tenders Tracked:** {len(tenders)} opportunities | **Total Scope:** {total_buses:,} buses\n"
     digest_text += f"**Priority Actions:** {len(go_tenders)} GO | {len(review_tenders)} REVIEW\n\n"
 
-    digest_text += "## 🚀 Recommended Opportunities (GO)\n"
+    digest_text += "## Recommended Opportunities (GO)\n"
     if go_tenders:
         for t in go_tenders[:5]:
             emd_str = f"INR {t.emd_amount:,.0f}" if t.emd_amount else "N/A"
@@ -118,7 +118,7 @@ async def get_daily_digest(db: Session = Depends(get_db)):
     else:
         digest_text += "_No immediate GO tenders match current profile._\n\n"
 
-    digest_text += "## ⚠️ Manual Review Required (REVIEW)\n"
+    digest_text += "## Manual Review Required (REVIEW)\n"
     if review_tenders:
         for t in review_tenders[:5]:
             digest_text += f"- **{t.title[:60]}...**\n  - *Authority:* {t.issuing_authority}\n  - *Reasoning:* {t.screening.reasoning[:100]}...\n\n"

@@ -196,7 +196,7 @@ Add to your Claude Desktop `claude_desktop_config.json`:
 }
 ```
 
-> ⚠️ Never commit actual API keys. The above is a placeholder example.
+> Note: Never commit actual API keys. The above is a placeholder example.
 
 **Test MCP tools:**
 ```bash

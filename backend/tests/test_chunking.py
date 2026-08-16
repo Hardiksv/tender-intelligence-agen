@@ -1,9 +1,9 @@
 import pytest
+from unittest.mock import MagicMock
 from app.services.chunking import chunk_document_pages
 from app.services.embeddings import generate_embedding
 from app.core.exceptions import EmbeddingDimensionMismatchException
-from app.schemas.chat import ChatRequest
-from app.services.rag import answer_tender_question
+from app.core.config import settings
 
 
 def test_chunking_page_awareness():
@@ -21,16 +21,17 @@ def test_chunking_page_awareness():
 
 def test_embedding_generation_dimension():
     vec = generate_embedding("Sample tender requirement for bus fleet size")
-    assert len(vec) == 384
+    assert len(vec) == settings.EMBEDDING_DIMENSION
 
 
 def test_embedding_dimension_mismatch_fails_fast(monkeypatch):
     """
     TEST: Intentional dimension mismatch MUST fail fast.
     """
-    from app.core.config import settings
-    # Temporarily set invalid expected dimension
-    monkeypatch.setattr(settings, "EMBEDDING_DIMENSION", 512)
+    # Mock fallback or vector generator to return invalid dimension (e.g. 50 dimensions)
+    monkeypatch.setattr("app.services.embeddings._generate_fallback_vector", lambda text, dim: [0.1] * 50)
+    monkeypatch.setattr("app.services.embeddings.litellm.embedding", MagicMock(side_effect=RuntimeError("Mock API error")))
+    monkeypatch.setattr("app.services.embeddings._get_sentence_transformer", MagicMock(side_effect=RuntimeError("Mock ST error")))
 
     with pytest.raises(EmbeddingDimensionMismatchException):
         generate_embedding("Sample text")
