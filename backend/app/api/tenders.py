@@ -68,11 +68,15 @@ def format_tender_response(t: Tender) -> TenderResponse:
 
 @router.get("", response_model=TenderListResponse)
 async def list_tenders(
-    state: Optional[str] = Query(None, description="Filter tenders by state"),
-    verdict: Optional[str] = Query(None, description="Filter tenders by GO / NO-GO / REVIEW verdict"),
-    search: Optional[str] = Query(None, description="Search term in title or authority"),
+    state: Optional[str] = Query(default=None, description="Filter tenders by state"),
+    verdict: Optional[str] = Query(default=None, description="Filter tenders by GO / NO-GO / REVIEW verdict"),
+    search: Optional[str] = Query(default=None, description="Search term in title or authority"),
     db: Session = Depends(get_db)
 ):
+    state_val = state if isinstance(state, str) else None
+    verdict_val = verdict if isinstance(verdict, str) else None
+    search_val = search if isinstance(search, str) else None
+
     stmt = select(Tender).order_by(Tender.submission_deadline.asc())
     tenders = db.scalars(stmt).all()
 
@@ -80,11 +84,11 @@ async def list_tenders(
     for t in tenders:
         resp = format_tender_response(t)
         
-        if state and t.state and state.lower() not in t.state.lower():
+        if state_val and t.state and state_val.lower() not in t.state.lower():
             continue
-        if verdict and resp.screening and resp.screening.verdict.upper() != verdict.upper():
+        if verdict_val and resp.screening and resp.screening.verdict.upper() != verdict_val.upper():
             continue
-        if search and search.lower() not in t.title.lower() and search.lower() not in t.issuing_authority.lower():
+        if search_val and search_val.lower() not in t.title.lower() and search_val.lower() not in t.issuing_authority.lower():
             continue
             
         filtered.append(resp)

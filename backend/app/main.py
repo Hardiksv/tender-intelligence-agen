@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -13,6 +13,7 @@ from app.core.exceptions import (
 )
 
 from app.api import tenders, screening, profile, chat, ingestion
+from app.db.database import get_db
 
 app = FastAPI(
     title="Tender Intelligence Agent API",
@@ -21,10 +22,15 @@ app = FastAPI(
 )
 
 # CORS Configuration
-origins = [settings.FRONTEND_ORIGIN] if settings.FRONTEND_ORIGIN else ["*"]
+origins = [
+    settings.FRONTEND_ORIGIN,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000"
+] if settings.FRONTEND_ORIGIN else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"] if not settings.FRONTEND_ORIGIN else origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -72,7 +78,7 @@ app.include_router(profile.router)
 app.include_router(chat.router)
 app.include_router(ingestion.router)
 
-
+# Root-level Route Aliases for assignment compliance
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Basic health check endpoint."""
@@ -82,6 +88,22 @@ async def health_check():
         "version": "1.0.0",
         "timezone": settings.TIMEZONE
     }
+
+@app.get("/tenders", tags=["Tenders Alias"])
+async def list_tenders_alias(db = Depends(get_db)):
+    return await tenders.list_tenders(db=db)
+
+@app.post("/ask", tags=["RAG Alias"])
+async def ask_alias(req: chat.ChatRequest, db = Depends(get_db)):
+    return await chat.chat_qna(req, db=db)
+
+@app.post("/search", tags=["Search Alias"])
+async def search_alias(req: chat.ChatRequest, db = Depends(get_db)):
+    return await chat.chat_qna(req, db=db)
+
+@app.post("/ingest", tags=["Ingestion Alias"])
+async def ingest_alias(background_tasks: BackgroundTasks, db = Depends(get_db)):
+    return await ingestion.trigger_ingestion_run(background_tasks, db=db)
 
 
 if __name__ == "__main__":

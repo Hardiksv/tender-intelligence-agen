@@ -4,9 +4,58 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     Column, String, Text, Integer, Numeric, DateTime, Enum as SQLEnum, ForeignKey, JSON
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
-from pgvector.sqlalchemy import Vector
+from sqlalchemy.types import TypeDecorator, CHAR, TypeEngine
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB as PG_JSONB
+
+class GUID(TypeDecorator):
+    """Platform-independent GUID type."""
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PG_UUID(as_uuid=True))
+        return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        return str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if not isinstance(value, uuid.UUID):
+            try:
+                return uuid.UUID(str(value))
+            except Exception:
+                return value
+        return value
+
+class JSONType(TypeDecorator):
+    """Platform-independent JSON type."""
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PG_JSONB)
+        return dialect.type_descriptor(JSON)
+
+class VectorType(TypeDecorator):
+    """Platform-independent Vector type."""
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            try:
+                from pgvector.sqlalchemy import Vector
+                return dialect.type_descriptor(Vector(settings.EMBEDDING_DIMENSION))
+            except Exception:
+                return dialect.type_descriptor(JSON)
+        return dialect.type_descriptor(JSON)
 
 from app.db.database import Base
 from app.core.config import settings
@@ -30,7 +79,7 @@ class IngestionStatusEnum(str, enum.Enum):
 class Tender(Base):
     __tablename__ = "tenders"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
     tender_ref = Column(String(200), nullable=True, index=True)
     title = Column(String(500), nullable=False)
     issuing_authority = Column(String(300), nullable=False)
@@ -64,7 +113,7 @@ class Tender(Base):
     document_hash = Column(String(64), unique=True, nullable=False, index=True)
     
     # Provenance tracking for every extracted field
-    extraction_provenance = Column(JSONB, nullable=True)
+    extraction_provenance = Column(JSONType, nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
@@ -79,16 +128,16 @@ class Tender(Base):
 class TenderEligibility(Base):
     __tablename__ = "tender_eligibility"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tender_id = Column(UUID(as_uuid=True), ForeignKey("tenders.id", ondelete="CASCADE"), nullable=False, unique=True)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    tender_id = Column(GUID, ForeignKey("tenders.id", ondelete="CASCADE"), nullable=False, unique=True)
     minimum_fleet_size = Column(Integer, nullable=True)
     minimum_annual_turnover = Column(Numeric(15, 2), nullable=True)
     minimum_experience_years = Column(Integer, nullable=True)
     minimum_past_contract_value = Column(Numeric(15, 2), nullable=True)
     minimum_depots_required = Column(Integer, nullable=True)
-    required_geographies = Column(JSONB, nullable=True)
+    required_geographies = Column(JSONType, nullable=True)
     # other_requirements contains items with explicit is_mandatory: bool
-    other_requirements = Column(JSONB, nullable=True)
+    other_requirements = Column(JSONType, nullable=True)
 
     tender = relationship("Tender", back_populates="eligibility")
 
@@ -96,23 +145,23 @@ class TenderEligibility(Base):
 class CompanyProfile(Base):
     __tablename__ = "company_profiles"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
     fleet_size = Column(Integer, nullable=False, default=0)
     annual_turnover = Column(Numeric(15, 2), nullable=False, default=0.0)
     years_experience = Column(Integer, nullable=False, default=0)
-    past_contract_sizes = Column(JSONB, nullable=False, default=list)
-    preferred_geographies = Column(JSONB, nullable=False, default=list)
+    past_contract_sizes = Column(JSONType, nullable=False, default=list)
+    preferred_geographies = Column(JSONType, nullable=False, default=list)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 class ScreeningResult(Base):
     __tablename__ = "screening_results"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tender_id = Column(UUID(as_uuid=True), ForeignKey("tenders.id", ondelete="CASCADE"), nullable=False)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    tender_id = Column(GUID, ForeignKey("tenders.id", ondelete="CASCADE"), nullable=False)
     verdict = Column(SQLEnum(ScreeningVerdictEnum), nullable=False)
     reasoning = Column(Text, nullable=False)
-    criteria_results = Column(JSONB, nullable=False)
+    criteria_results = Column(JSONType, nullable=False)
     screened_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     tender = relationship("Tender", back_populates="screening_results")
@@ -121,8 +170,8 @@ class ScreeningResult(Base):
 class Document(Base):
     __tablename__ = "documents"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tender_id = Column(UUID(as_uuid=True), ForeignKey("tenders.id", ondelete="CASCADE"), nullable=False)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    tender_id = Column(GUID, ForeignKey("tenders.id", ondelete="CASCADE"), nullable=False)
     file_name = Column(String(255), nullable=False)
     document_type = Column(String(50), nullable=False, default="ORIGINAL_RFP")  # ORIGINAL_RFP, AMENDMENT, CORRIGENDUM, CLARIFICATION
     amendment_number = Column(String(50), nullable=True)  # e.g., "Amendment 5"
@@ -138,14 +187,14 @@ class Document(Base):
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tender_id = Column(UUID(as_uuid=True), ForeignKey("tenders.id", ondelete="CASCADE"), nullable=False, index=True)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    tender_id = Column(GUID, ForeignKey("tenders.id", ondelete="CASCADE"), nullable=False, index=True)
+    document_id = Column(GUID, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
     chunk_text = Column(Text, nullable=False)
     page_number = Column(Integer, nullable=False)
     chunk_index = Column(Integer, nullable=False)
-    embedding = Column(Vector(settings.EMBEDDING_DIMENSION), nullable=False)
-    chunk_metadata = Column(JSONB, nullable=True)  # Renamed from metadata to avoid SQLAlchemy reserved attribute conflict
+    embedding = Column(VectorType, nullable=False)
+    chunk_metadata = Column(JSONType, nullable=True)
 
     tender = relationship("Tender", back_populates="chunks")
     document = relationship("Document", back_populates="chunks")
@@ -154,7 +203,7 @@ class DocumentChunk(Base):
 class IngestionJob(Base):
     __tablename__ = "ingestion_jobs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
     status = Column(SQLEnum(IngestionStatusEnum), nullable=False, default=IngestionStatusEnum.PENDING, index=True)
     total_documents = Column(Integer, nullable=False, default=0)
     completed_documents = Column(Integer, nullable=False, default=0)

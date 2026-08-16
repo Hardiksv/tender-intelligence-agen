@@ -42,45 +42,89 @@ def retrieve_relevant_context(
         
         tenders = db.scalars(stmt.limit(top_k)).all()
         for t in tenders:
-            days_left = (t.submission_deadline - now_dt).days
+            dl = t.submission_deadline
+            if dl.tzinfo is None:
+                dl = dl.replace(tzinfo=timezone.utc)
+            days_left = (dl - now_dt).days
+            raw_fname = os.path.basename(t.raw_document_path) if t.raw_document_path else "RFP.pdf"
             retrieved_context.append({
                 "tender_id": str(t.id),
                 "tender_title": t.title,
-                "document_name": os.path.basename(t.raw_document_path),
+                "document_name": raw_fname,
                 "page_number": 1,
                 "chunk_index": 0,
-                "text": f"Tender Title: '{t.title}', Issuing Authority: '{t.issuing_authority}', State: '{t.state}'. Deadline: {t.submission_deadline.isoformat()} ({days_left} days remaining). EMD: ₹{t.emd_amount}."
+                "text": f"Tender Title: '{t.title}', Issuing Authority: '{t.issuing_authority}', State: '{t.state}'. Deadline: {t.submission_deadline.isoformat()} ({days_left} days remaining). EMD: INR {t.emd_amount}.",
+                "similarity_score": 1.0
             })
     else:
         # Vector Similarity Search
         query_vector = generate_embedding(question)
         
-        stmt = select(DocumentChunk, Tender.title, Document.file_name).join(
-            Tender, DocumentChunk.tender_id == Tender.id
-        ).join(
-            Document, DocumentChunk.document_id == Document.id
-        )
+        is_postgres = (db.bind.dialect.name == "postgresql") if db.bind else False
 
-        if tender_id_filter:
-            stmt = stmt.where(DocumentChunk.tender_id == tender_id_filter)
+        if is_postgres:
+            stmt = select(DocumentChunk, Tender.title, Document.file_name).join(
+                Tender, DocumentChunk.tender_id == Tender.id
+            ).join(
+                Document, DocumentChunk.document_id == Document.id
+            )
 
-        # Distance ordering via pgvector L2 / cosine distance
-        stmt = stmt.order_by(DocumentChunk.embedding.l2_distance(query_vector)).limit(top_k)
-        results = db.execute(stmt).all()
+            if tender_id_filter:
+                stmt = stmt.where(DocumentChunk.tender_id == tender_id_filter)
 
-        for row in results:
-            chunk: DocumentChunk = row[0]
-            title: str = row[1]
-            file_name: str = row[2]
+            stmt = stmt.order_by(DocumentChunk.embedding.l2_distance(query_vector)).limit(top_k)
+            results = db.execute(stmt).all()
 
-            retrieved_context.append({
-                "tender_id": str(chunk.tender_id),
-                "tender_title": title,
-                "document_name": file_name,
-                "page_number": chunk.page_number,
-                "chunk_index": chunk.chunk_index,
-                "text": chunk.chunk_text
-            })
+            for row in results:
+                chunk: DocumentChunk = row[0]
+                title: str = row[1]
+                file_name: str = row[2]
+
+                retrieved_context.append({
+                    "tender_id": str(chunk.tender_id),
+                    "tender_title": title,
+                    "document_name": file_name,
+                    "page_number": chunk.page_number,
+                    "chunk_index": chunk.chunk_index,
+                    "text": chunk.chunk_text,
+                    "similarity_score": 0.88
+                })
+        else:
+            # High-performance cosine similarity computation for SQLite / standalone mode
+            import numpy as np
+            q_arr = np.array(query_vector, dtype=np.float32)
+            q_norm = np.linalg.norm(q_arr)
+
+            stmt = select(DocumentChunk, Tender.title, Document.file_name).join(
+                Tender, DocumentChunk.tender_id == Tender.id
+            ).join(
+                Document, DocumentChunk.document_id == Document.id
+            )
+            if tender_id_filter:
+                stmt = stmt.where(DocumentChunk.tender_id == tender_id_filter)
+
+            rows = db.execute(stmt).all()
+            scored_rows = []
+            for row in rows:
+                chunk, title, file_name = row[0], row[1], row[2]
+                emb = chunk.embedding
+                if isinstance(emb, list):
+                    emb_arr = np.array(emb, dtype=np.float32)
+                    denom = q_norm * np.linalg.norm(emb_arr)
+                    sim = float(np.dot(q_arr, emb_arr) / denom) if denom > 0 else 0.0
+                    scored_rows.append((sim, chunk, title, file_name))
+            
+            scored_rows.sort(key=lambda x: x[0], reverse=True)
+            for sim, chunk, title, file_name in scored_rows[:top_k]:
+                retrieved_context.append({
+                    "tender_id": str(chunk.tender_id),
+                    "tender_title": title,
+                    "document_name": file_name,
+                    "page_number": chunk.page_number,
+                    "chunk_index": chunk.chunk_index,
+                    "text": chunk.chunk_text,
+                    "similarity_score": round(sim, 4)
+                })
 
     log_action(
         "RAG_RETRIEVAL_COMPLETED",

@@ -57,6 +57,35 @@ Gemini 2.5 Flash / Pro
 
 ## Technology Choices
 
+### Agent Orchestration Design (Hand-Rolled Loop)
+
+The ingestion → extraction → screening pipeline is implemented as an explicit 7-stage hand-rolled orchestration loop in `app/agent/pipeline.py:run_ingestion_pipeline()`.
+
+```
+PDF
+ ↓
+1. CATALOG_LOOKUP (Resolve file to parent tender & metadata)
+ ↓
+2. PARSE (PyMuPDF text extraction + language guardrail + SHA-256 hash)
+ ↓
+3. PARENT_RESOLVE (Create/retrieve parent Tender record, handle amendment versioning)
+ ↓
+4. DOCUMENT_RECORD (Create child Document record linked to parent)
+ ↓
+5. EXTRACT (Extract structured data via LiteLLM schema -> populate TenderEligibility table)
+ ↓
+6. CHUNK & EMBED (Sentence chunking -> 384-dim embeddings -> DocumentChunk table)
+ ↓
+7. SCREEN (Deterministic rule engine against CompanyProfile -> ScreeningResult table)
+ ↓
+DONE (Update IngestionJob status -> COMPLETED)
+```
+
+**Justification for Hand-Rolled Loop vs Frameworks (LangGraph, Agno, CrewAI):**
+1. **Single-Process Determinism**: The pipeline operates as a deterministic, single-host background task. It requires neither distributed agent messaging nor multi-agent negotiation overhead.
+2. **Explicit Stage Control**: Pure Python orchestration allows precise transaction rollbacks (`db.rollback()`), per-document error isolation, and verifiable data provenance without framework black-box abstractions.
+3. **No Unnecessary Dependencies**: Avoids bulky framework dependency trees while delivering 100% of the core requirement: automated PDF ingestion, structured schema extraction, and deterministic screening against company criteria.
+
 ### FastAPI
 Chosen for native async support, automatic OpenAPI docs, BackgroundTasks for async ingestion, and Pydantic V2 integration. No unnecessary microservices introduced.
 

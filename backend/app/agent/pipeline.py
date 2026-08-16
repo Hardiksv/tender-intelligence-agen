@@ -14,9 +14,11 @@ from app.db.models import (
 )
 from app.services.pdf_parser import parse_pdf_document
 from app.services.extraction import extract_tender_structured_data
+from app.services.screening import screen_tender_eligibility
 from app.services.chunking import chunk_document_pages
 from app.services.embeddings import generate_embeddings_batch
 from app.schemas.profile import CompanyProfileBase
+from app.schemas.extraction import TenderEligibilitySchema, OtherRequirementItem
 
 SEED_DATA_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "raw")
@@ -348,7 +350,51 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: Optional[List[str]] = 
                 # Create child Document record (linked to parent Tender)
                 existing_doc = db.query(Document).filter(Document.document_hash == parsed_doc["document_hash"]).first()
                 if existing_doc:
-                    logger.info(f"Document {file_name} already exists. Skipping duplicate.")
+                    logger.info(f"Document {file_name} already exists. Verifying extraction & screening state.")
+                    elig_check = db.query(TenderEligibility).filter(TenderEligibility.tender_id == tender.id).first()
+                    screening_check = db.query(ScreeningResult).filter(ScreeningResult.tender_id == tender.id).first()
+                    if not elig_check or not screening_check:
+                        extraction_res = extract_tender_structured_data(parsed_doc["full_text"], file_name)
+                        extracted_data = extraction_res["extraction"]
+                        extracted_elig = extracted_data.eligibility
+                        other_reqs_data = [req.model_dump() for req in extracted_elig.other_requirements] if extracted_elig.other_requirements else []
+                        if not elig_check:
+                            elig_check = TenderEligibility(
+                                tender_id=tender.id,
+                                minimum_fleet_size=extracted_elig.minimum_fleet_size,
+                                minimum_annual_turnover=extracted_elig.minimum_annual_turnover,
+                                minimum_experience_years=extracted_elig.minimum_experience_years,
+                                minimum_past_contract_value=extracted_elig.minimum_past_contract_value,
+                                minimum_depots_required=extracted_elig.minimum_depots_required,
+                                required_geographies=extracted_elig.required_geographies or ([tender.state] if tender.state else []),
+                                other_requirements=other_reqs_data
+                            )
+                            db.add(elig_check)
+                            db.flush()
+                        if not screening_check:
+                            profile_db = get_or_create_default_profile(db)
+                            profile_base = CompanyProfileBase(
+                                fleet_size=profile_db.fleet_size,
+                                annual_turnover=float(profile_db.annual_turnover),
+                                years_experience=profile_db.years_experience,
+                                past_contract_sizes=profile_db.past_contract_sizes,
+                                preferred_geographies=profile_db.preferred_geographies
+                            )
+                            screening_res = screen_tender_eligibility(
+                                tender_id=str(tender.id),
+                                tender_title=tender.title,
+                                tender_state=tender.state or "",
+                                eligibility=extracted_elig,
+                                profile=profile_base
+                            )
+                            screening_record = ScreeningResult(
+                                tender_id=tender.id,
+                                verdict=screening_res.verdict.value,
+                                reasoning=screening_res.reasoning,
+                                criteria_results=[c.model_dump() for c in screening_res.criteria_results]
+                            )
+                            db.add(screening_record)
+                            db.flush()
                     job.completed_documents += 1
                     db.commit()
                     continue
@@ -365,7 +411,41 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: Optional[List[str]] = 
                 db.add(doc_record)
                 db.flush()
 
-                # Chunking & Embeddings (linking every chunk to parent Tender AND child Document)
+                # Stage 5: Structured Extraction & TenderEligibility Storage
+                extraction_res = extract_tender_structured_data(parsed_doc["full_text"], file_name)
+                extracted_data = extraction_res["extraction"]
+                extracted_elig = extracted_data.eligibility
+                other_reqs_data = [req.model_dump() for req in extracted_elig.other_requirements] if extracted_elig.other_requirements else []
+
+                elig_record = db.query(TenderEligibility).filter(TenderEligibility.tender_id == tender.id).first()
+                if not elig_record:
+                    elig_record = TenderEligibility(
+                        tender_id=tender.id,
+                        minimum_fleet_size=extracted_elig.minimum_fleet_size,
+                        minimum_annual_turnover=extracted_elig.minimum_annual_turnover,
+                        minimum_experience_years=extracted_elig.minimum_experience_years,
+                        minimum_past_contract_value=extracted_elig.minimum_past_contract_value,
+                        minimum_depots_required=extracted_elig.minimum_depots_required,
+                        required_geographies=extracted_elig.required_geographies or ([tender.state] if tender.state else []),
+                        other_requirements=other_reqs_data
+                    )
+                    db.add(elig_record)
+                else:
+                    if extracted_elig.minimum_fleet_size is not None:
+                        elig_record.minimum_fleet_size = extracted_elig.minimum_fleet_size
+                    if extracted_elig.minimum_annual_turnover is not None:
+                        elig_record.minimum_annual_turnover = extracted_elig.minimum_annual_turnover
+                    if extracted_elig.minimum_experience_years is not None:
+                        elig_record.minimum_experience_years = extracted_elig.minimum_experience_years
+                    if extracted_elig.minimum_past_contract_value is not None:
+                        elig_record.minimum_past_contract_value = extracted_elig.minimum_past_contract_value
+                    if extracted_elig.required_geographies:
+                        elig_record.required_geographies = extracted_elig.required_geographies
+                    if other_reqs_data:
+                        elig_record.other_requirements = other_reqs_data
+                db.flush()
+
+                # Stage 6: Chunking & Embeddings (linking every chunk to parent Tender AND child Document)
                 raw_chunks = chunk_document_pages(parsed_doc["pages"])
                 chunk_texts = [c["chunk_text"] for c in raw_chunks]
                 embeddings = generate_embeddings_batch(chunk_texts)
@@ -387,11 +467,39 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: Optional[List[str]] = 
                     )
                     db.add(db_chunk)
 
+                db.flush()
+
+                # Stage 7: Automated Screening against Company Profile
+                profile_db = get_or_create_default_profile(db)
+                profile_base = CompanyProfileBase(
+                    fleet_size=profile_db.fleet_size,
+                    annual_turnover=float(profile_db.annual_turnover),
+                    years_experience=profile_db.years_experience,
+                    past_contract_sizes=profile_db.past_contract_sizes,
+                    preferred_geographies=profile_db.preferred_geographies
+                )
+
+                screening_res = screen_tender_eligibility(
+                    tender_id=str(tender.id),
+                    tender_title=tender.title,
+                    tender_state=tender.state or "",
+                    eligibility=extracted_elig,
+                    profile=profile_base
+                )
+
+                screening_record = ScreeningResult(
+                    tender_id=tender.id,
+                    verdict=screening_res.verdict.value,
+                    reasoning=screening_res.reasoning,
+                    criteria_results=[c.model_dump() for c in screening_res.criteria_results]
+                )
+                db.add(screening_record)
+
                 db.commit()
                 job.completed_documents += 1
                 db.commit()
 
-                log_action("DOCUMENT_INGESTED", tender_id=str(tender.id), details={"file_name": file_name, "type": meta["document_type"]})
+                log_action("DOCUMENT_INGESTED", tender_id=str(tender.id), details={"file_name": file_name, "type": meta["document_type"], "screening_verdict": screening_res.verdict.value})
 
             except Exception as doc_err:
                 logger.error(f"Error processing document {file_name}: {doc_err}")
