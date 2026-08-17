@@ -123,6 +123,62 @@ CATALOG = {
         "emd_amount": 10000000.0,
         "document_fee": 25000.0,
         "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/11/CESL-PM-eBus-Sewa-Tender-2-Amend-11_Clear-Copy-1.pdf"
+    },
+    "pm_ebus_sewa_tender_1_amend_1.pdf": {
+        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
+        "is_parent": False,
+        "document_type": "AMENDMENT",
+        "amendment_number": "Amendment No. 1",
+        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_1_tenderNo1919.pdf"
+    },
+    "pm_ebus_sewa_tender_1_amend_2.pdf": {
+        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
+        "is_parent": False,
+        "document_type": "AMENDMENT",
+        "amendment_number": "Amendment No. 2",
+        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_2_tenderNo1919.pdf"
+    },
+    "pm_ebus_sewa_tender_1_amend_3.pdf": {
+        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
+        "is_parent": False,
+        "document_type": "AMENDMENT",
+        "amendment_number": "Amendment No. 3",
+        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_3_tenderNo1919.pdf"
+    },
+    "pm_ebus_sewa_tender_1_amend_4.pdf": {
+        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
+        "is_parent": False,
+        "document_type": "AMENDMENT",
+        "amendment_number": "Amendment No. 4",
+        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_4_tenderNo1919.pdf"
+    },
+    "pm_ebus_sewa_tender_1_amend_6.pdf": {
+        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
+        "is_parent": False,
+        "document_type": "AMENDMENT",
+        "amendment_number": "Amendment No. 6",
+        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_6_tenderNo1919.pdf"
+    },
+    "pm_ebus_sewa_tender_1_amend_7.pdf": {
+        "tender_ref": "CESL/06/2023-24/PM-eBusSewa/23241106",
+        "is_parent": False,
+        "document_type": "AMENDMENT",
+        "amendment_number": "Amendment No. 7",
+        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_7_tenderNo1919.pdf"
+    },
+    "pm_ebus_sewa_tender_2_amend_2.pdf": {
+        "tender_ref": "CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013",
+        "is_parent": False,
+        "document_type": "AMENDMENT",
+        "amendment_number": "Amendment No. 2",
+        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_2_tenderNo2324003013.pdf"
+    },
+    "pm_ebus_sewa_tender_2_amend_3.pdf": {
+        "tender_ref": "CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013",
+        "is_parent": False,
+        "document_type": "AMENDMENT",
+        "amendment_number": "Amendment No. 3",
+        "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/AmendNo_3_tenderNo2324003013.pdf"
     }
 }
 
