@@ -63,7 +63,11 @@ def retrieve_relevant_context(
         is_postgres = (db.bind.dialect.name == "postgresql") if db.bind else False
 
         if is_postgres:
-            stmt = select(DocumentChunk, Tender.title, Document.file_name).join(
+            # cosine_distance returns a value in [0.0, 2.0] for normalized vectors;
+            # similarity = 1.0 - cosine_distance gives [−1.0, 1.0], clamped to [0.0, 1.0]
+            distance_col = DocumentChunk.embedding.cosine_distance(query_vector).label("cos_dist")
+
+            stmt = select(DocumentChunk, Tender.title, Document.file_name, distance_col).join(
                 Tender, DocumentChunk.tender_id == Tender.id
             ).join(
                 Document, DocumentChunk.document_id == Document.id
@@ -72,13 +76,15 @@ def retrieve_relevant_context(
             if tender_id_filter:
                 stmt = stmt.where(DocumentChunk.tender_id == tender_id_filter)
 
-            stmt = stmt.order_by(DocumentChunk.embedding.l2_distance(query_vector)).limit(top_k)
+            stmt = stmt.order_by(distance_col).limit(top_k)
             results = db.execute(stmt).all()
 
             for row in results:
                 chunk: DocumentChunk = row[0]
                 title: str = row[1]
                 file_name: str = row[2]
+                cos_dist: float = float(row[3])
+                similarity_score = round(max(0.0, 1.0 - cos_dist), 4)
 
                 retrieved_context.append({
                     "tender_id": str(chunk.tender_id),
@@ -87,7 +93,7 @@ def retrieve_relevant_context(
                     "page_number": chunk.page_number,
                     "chunk_index": chunk.chunk_index,
                     "text": chunk.chunk_text,
-                    "similarity_score": 0.88
+                    "similarity_score": similarity_score
                 })
         else:
             # High-performance cosine similarity computation for SQLite / standalone mode

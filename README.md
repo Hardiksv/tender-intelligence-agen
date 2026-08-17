@@ -77,17 +77,58 @@ curl -X POST http://localhost:8000/api/ingestion/run
 
 ---
 
+## Live Demo
+
+| Service | URL |
+|---|---|
+| Frontend Web UI | *(Render deploy in progress — URL will be updated here once live)* |
+| Backend REST API + Swagger | *(Render deploy in progress — URL will be updated here once live)* |
+
+> To deploy your own instance, follow the Render step-by-step guide below.
+
+---
+
 ## Cloud Deployment
 
-### 1. One-Click Deploy on Render (Infrastructure-as-Code)
-This repository includes a native [`render.yaml`](render.yaml) blueprint:
-1. Connect your GitHub repository to [Render.com](https://render.com).
-2. Create a new **Blueprint** instance selecting `render.yaml`.
-3. Set the secret `LLM_API_KEY` environment variable in the dashboard.
-4. Render automatically provisions the PostgreSQL database, applies pgvector, builds the backend, and deploys the React frontend.
+### Step-by-Step Deploy on Render (Free Tier)
 
-### 2. Railway / Cloud VM / Docker
-Deploy directly using the included `Dockerfile` in `backend/` and `frontend/` with PostgreSQL container:
+> Estimated time: under 10 minutes. `render.yaml` in this repo defines the full 3-service blueprint (PostgreSQL + pgvector, FastAPI backend, React frontend).
+
+**Step 1 — Create a Render account:**
+Go to [https://render.com](https://render.com) and sign up (free, GitHub login works).
+
+**Step 2 — Connect GitHub repository:**
+- Dashboard → New → Blueprint
+- Select the `Hardiksv/tender-intelligence-agen` repository
+- Render detects `render.yaml` automatically and shows 3 services to create
+
+**Step 3 — Set the secret environment variable:**
+- Before clicking Deploy, set `LLM_API_KEY` → your Gemini API key
+- All other env vars (DATABASE_URL, LLM_MODEL, EMBEDDING_MODEL, EMBEDDING_DIMENSION) are pre-configured in `render.yaml`
+
+**Step 4 — Click "Apply Blueprint":**
+- Render provisions PostgreSQL (with pgvector extension enabled automatically on Render managed Postgres)
+- Runs `cd backend && pip install -r requirements.txt`
+- Starts backend: `cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`
+- Builds React frontend with `cd frontend && npm install && npm run build`
+
+**Step 5 — Run migrations and seed ingestion:**
+```bash
+# After deploy, open backend Render console (Dashboard → tender-backend → Shell)
+cd backend && alembic upgrade head
+
+# Then trigger ingestion from the API:
+curl -X POST https://YOUR-BACKEND-URL.onrender.com/api/ingestion/run
+```
+
+**Step 6 — Access the live app:**
+- Frontend URL: `https://tender-frontend.onrender.com` (or your Render-assigned subdomain)
+- Backend docs: `https://YOUR-BACKEND-URL.onrender.com/docs`
+
+> **Cold-start note:** Render free tier services sleep after 15 minutes of inactivity. First request after sleep takes ~30 seconds to wake up. This is expected for free deployments.
+
+### Railway / Docker (Self-hosted Alternative)
+Deploy directly using the included `Dockerfile` in `backend/` and `frontend/`:
 ```bash
 docker compose up -d
 ```

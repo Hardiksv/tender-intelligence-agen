@@ -97,8 +97,8 @@ Expected response:
 {
   "job_id": "...",
   "status": "COMPLETED",
-  "total_documents": 13,
-  "completed_documents": 13,
+  "total_documents": 6,
+  "completed_documents": 6,
   "failed_documents": 0,
   "current_document": null
 }
@@ -204,4 +204,86 @@ python -m pytest tests/ -o pythonpath=. -v
 
 # Playwright E2E browser automation suite
 python scripts/e2e_playwright_test.py
+```
+
+---
+
+## Top-3 Failure Modes and Fixes
+
+### 1. pgvector Extension Not Installed
+
+**Symptom:** Alembic migration fails with:
+```
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedObject) type "vector" does not exist
+LINE 1: embedding vector(768) NOT NULL
+```
+
+**Root Cause:** The PostgreSQL instance does not have the `pgvector` extension installed. This commonly occurs when using a self-hosted Postgres instance without manual extension setup, or when the database user lacks `CREATE EXTENSION` privilege.
+
+**Fix:**
+```sql
+-- Connect to the database and install the extension
+psql -U postgres -d tender_db
+CREATE EXTENSION IF NOT EXISTS vector;
+\q
+
+-- Then re-run migrations
+cd backend && alembic upgrade head
+```
+
+For managed Postgres (e.g. Render, Supabase, Neon), enable `pgvector` from the dashboard Extensions tab before running migrations.
+
+---
+
+### 2. Embedding Dimension Mismatch
+
+**Symptom:** Ingestion job fails immediately with:
+```
+EmbeddingDimensionMismatchError: Received embedding of dimension 1536 but table column expects 768.
+```
+
+**Root Cause:** `EMBEDDING_MODEL` or `EMBEDDING_DIMENSION` in `.env` does not match the vector column dimension already created in the database (e.g., the DB was initialized with `EMBEDDING_DIMENSION=768` but `.env` was changed to a model that outputs 1536-dim vectors, or vice versa).
+
+**Fix:**
+```bash
+# Step 1 — Verify your .env values match each other
+# EMBEDDING_MODEL=gemini/text-embedding-004 → dimension 768
+# EMBEDDING_MODEL=openai/text-embedding-ada-002 → dimension 1536
+
+# Step 2 — If dimension mismatch, reset migrations and re-ingest
+cd backend
+alembic downgrade base   # Drops all tables including vector column
+alembic upgrade head     # Recreates with correct EMBEDDING_DIMENSION from .env
+# Trigger fresh ingestion
+curl -X POST http://localhost:8000/api/ingestion/run
+```
+
+---
+
+### 3. LLM API Key Invalid or Rate-Limited
+
+**Symptom:** RAG chat endpoint returns HTTP 200 but answer is:
+```
+Unable to synthesize grounded answer due to LLM provider error (...)
+```
+or ingestion extraction step logs:
+```
+LLM_CALL_FAILED: AuthenticationError: 401 API key invalid
+```
+
+**Root Cause:** `LLM_API_KEY` in `.env` is missing, expired, or the Gemini quota for the day is exhausted.
+
+**Fix:**
+```bash
+# Step 1 — Verify the key is valid
+curl "https://generativelanguage.googleapis.com/v1beta/models?key=$LLM_API_KEY"
+# Should return a list of models, not a 400/403 error
+
+# Step 2 — If quota exhausted, activate the Groq fallback
+# Add to .env:
+LLM_FALLBACK_MODEL=groq/llama-3.3-70b-versatile
+GROQ_API_KEY=your_groq_api_key_here
+
+# LiteLLM auto-failovers to LLM_FALLBACK_MODEL on any primary provider error.
+# No code changes needed — restart the backend after updating .env.
 ```
