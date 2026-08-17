@@ -22,11 +22,6 @@ wheels/
 *.egg
 .pytest_cache/
 
-# Tests & Test Scripts (Do not upload to GitHub)
-tests/
-backend/tests/
-scripts/
-
 # Virtual Environment
 venv/
 .venv/
@@ -34,8 +29,6 @@ ENV/
 
 # Environment Variables & Secrets
 .env
-.env.example
-.env*
 *.pem
 *.key
 
