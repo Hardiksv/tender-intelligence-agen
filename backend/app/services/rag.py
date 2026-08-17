@@ -23,7 +23,7 @@ def load_rag_prompt() -> str:
 def answer_tender_question(db: Session, request: ChatRequest) -> ChatResponse:
     """
     RAG service answering user questions grounded strictly in retrieved vector/SQL chunks
-    and returning metadata-backed citations.
+    and returning metadata-backed citations. No synthetic or hallucinated answers.
     """
     context_chunks = retrieve_relevant_context(
         db=db,
@@ -66,24 +66,34 @@ def answer_tender_question(db: Session, request: ChatRequest) -> ChatResponse:
     prompt_template = load_rag_prompt()
     prompt = prompt_template.format(question=request.question, context=context_str)
 
-    # Call LLM for grounded completion
-    res = llm_client.generate(prompt=prompt, temperature=0.0)
+    try:
+        # Call LLM for grounded completion over genuine retrieved context
+        res = llm_client.generate(prompt=prompt, temperature=0.0)
 
-    log_action(
-        "RAG_QUERY",
-        status="SUCCESS",
-        details={
-            "question": request.question[:40],
-            "citations_count": len(citations),
-            "model": res["model"]
-        },
-        extra_meta=res["usage"]
-    )
+        log_action(
+            "RAG_QUERY",
+            status="SUCCESS",
+            details={
+                "question": request.question[:40],
+                "citations_count": len(citations),
+                "model": res["model"]
+            },
+            extra_meta=res["usage"]
+        )
 
-    return ChatResponse(
-        question=request.question,
-        answer=res["content"],
-        citations=citations,
-        model_used=res["model"],
-        usage=res["usage"]
-    )
+        return ChatResponse(
+            question=request.question,
+            answer=res["content"],
+            citations=citations,
+            model_used=res["model"],
+            usage=res["usage"]
+        )
+    except Exception as e:
+        logger.error(f"RAG LLM synthesis error: {e}")
+        return ChatResponse(
+            question=request.question,
+            answer=f"Unable to synthesize grounded answer due to LLM provider error ({str(e)}). Please ensure a valid LLM_API_KEY is configured.",
+            citations=citations,
+            model_used="error",
+            usage={"model": "error", "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "is_estimated": True}
+        )
