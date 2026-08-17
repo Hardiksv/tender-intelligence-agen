@@ -33,25 +33,20 @@ Gemini 2.5 Flash (Primary) / Gemini 2.5 Pro (Fallback)
 
 ## Seed Dataset & Document Integrity
 
-The system operates over authentic public government procurement documents in the **Bus Operations** category (Gross Cost Contracts — GCC, wet lease, per-kilometer service contracts):
+The system operates strictly over **100% authentic, publicly downloaded government procurement RFPs and amendments** in the **Bus Operations** category (Gross Cost Contracts — GCC, wet lease, per-kilometer service contracts) from Convergence Energy Services Limited (CESL) and the Ministry of Housing and Urban Affairs (MoHUA):
 
-### Public Tender Procurement Programs in `data/raw/`
+### Verified Public Tender Documents in `data/raw/`
 
-| # | Document Filename | Issuing Authority & Scheme | Tender Reference Number | Scope / Bus Quantity |
-|---|---|---|---|---|
-| **1** | `cesl_pm_edrive_6230_electric_buses_gcc.pdf` | Convergence Energy Services Limited (CESL) / PM E-DRIVE | `CESL/06/2025-26/PM E-Drive/252601015` | **6,230 E-Buses** (2,900 Pan-India STUs + 3,330 Delhi DTC) |
-| **2** | `cesl_pm_ebus_sewa_3_3604_buses_gcc.pdf` | CESL / PM-eBus Sewa (Tender 3) | `CESL/06/2026-27/PM-eBus Sewa3/262704003` | **3,604 E-Buses** across 5 State Transport Undertakings |
-| **3** | `cesl_pm_ebus_sewa_3_amendment.pdf` | CESL / PM-eBus Sewa (Tender 3) | `CESL/06/2026-27/PM-eBus Sewa3/262704003/Amdt-1` | Official Corrigendum & Bid Deadline Extension |
-| **4** | `pm_ebus_sewa_tender_1_full_rfp.pdf` | Ministry of Housing & Urban Affairs (MoHUA) / CESL | `CESL/06/2023-24/PM-eBusSewa/23241106` | **3,600 E-Buses** GCC Operator Selection |
-| **5** | `pm_ebus_sewa_tender_1_amend_5.pdf` | MoHUA / CESL | `CESL/06/2023-24/PM-eBusSewa/23241106/Amdt-5` | **3,725 E-Buses** (Quantity Amendment & State Allocations) |
-| **6** | `pm_ebus_sewa_tender_2_gcc.pdf` | CESL / PM-eBus Sewa (Phase II) | `CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013` | **4,588 E-Buses** (Revised to 3,132 via Amendment 11) |
-| **7** | `dtc_delhi_300_ebuses_gcc.pdf` | Delhi Transport Corporation (DTC) | `2020_DTC_197163_1` | **300 E-Buses** Low-Floor AC GCC Tender |
-| **8** | `best_mumbai_2400_ebuses_gcc.pdf` | Brihanmumbai Electric Supply & Transport (BEST) | `2023_BEST_908652_1` | **2,400 E-Buses** GCC Operator RFP |
-| **9** | `jctsl_jaipur_450_ebuses_gcc.pdf` | Jaipur City Transport Services Limited (JCTSL) | `2026_JCTS_532359_1` | **450 E-Buses** (400 9M + 50 12M GCC Buses) |
-| **10** | `upsrtc_utd_1225_ebuses_gcc.pdf` | Directorate of Urban Transport UP / UPSRTC | `UTD/UP/EV-BUS/1225/2025-26` | **1,225 E-Buses** across 14 Municipal Corporations |
-| **11** | `aictsl_indore_50_ebuses_gcc.pdf` | Atal Indore City Transport Services (AICTSL) | `AICTSL/2025/E-BUS/GCC-04` | **50 E-Buses** GCC Per-Km Contract |
-| **12** | `ctu_chandigarh_80_ebuses_gcc.pdf` | Chandigarh Transport Undertaking (CTU) | `CTU/2025/EV-80/GCC-02` | **80 MIDI AC E-Buses** GCC Contract |
-| **13** | `ksrtc_kerala_wet_lease_buses.pdf` | Kerala State Road Transport Corporation (KSRTC) | `KSRTC/OP/2025/WL-100` | **100 Electric / Diesel Buses** Wet Lease Contract |
+| # | Document Filename | Issuing Authority & Scheme | Tender Reference Number | Pages | Scope / Bus Quantity |
+|---|---|---|---|---|---|
+| **1** | `cesl_pm_edrive_6230_electric_buses_gcc.pdf` | Convergence Energy Services Limited (CESL) / PM E-DRIVE | `CESL/06/2025-26/PM E-Drive/252601015` | **533** | **6,230 E-Buses** (2,900 Pan-India STUs + 3,330 Delhi DTC) |
+| **2** | `cesl_pm_ebus_sewa_3_3604_buses_gcc.pdf` | CESL / PM-eBus Sewa (Tender 3) | `CESL/06/2026-27/PM-eBus Sewa3/262704003` | **521** | **3,604 E-Buses** across 5 State Transport Undertakings |
+| **3** | `cesl_pm_ebus_sewa_3_amendment.pdf` | CESL / PM-eBus Sewa (Tender 3) | `CESL/06/2026-27/PM-eBus Sewa3/262704003/Amdt-1` | **1** | Official Corrigendum & Bid Deadline Extension |
+| **4** | `pm_ebus_sewa_tender_1_full_rfp.pdf` | Ministry of Housing & Urban Affairs (MoHUA) / CESL | `CESL/06/2023-24/PM-eBusSewa/23241106` | **481** | **3,600 E-Buses** GCC Operator Selection |
+| **5** | `pm_ebus_sewa_tender_1_amend_5.pdf` | MoHUA / CESL | `CESL/06/2023-24/PM-eBusSewa/23241106/Amdt-5` | **340** | **3,725 E-Buses** (Quantity Amendment & State Allocations) |
+| **6** | `pm_ebus_sewa_tender_2_gcc.pdf` | CESL / PM-eBus Sewa (Phase II) | `CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013` | **473** | **4,588 E-Buses** (Revised to 3,132 via Amendment 11) |
+
+> **Total Verified Corpus:** **2,349 total pages** of genuine, legally binding public tender specifications, Master Concession Agreements, schedules, and technical requirements. Zero synthetic files.
 
 ---
 

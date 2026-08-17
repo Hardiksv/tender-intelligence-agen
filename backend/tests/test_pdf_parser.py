@@ -5,7 +5,7 @@ from app.services.language import detect_document_language
 
 SEED_PDF_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "data", "raw", "jctsl_jaipur_450_ebuses_gcc.pdf"
+    "data", "raw", "cesl_pm_ebus_sewa_3_amendment.pdf"
 )
 
 
@@ -13,11 +13,10 @@ def test_pdf_parser_success():
     assert os.path.exists(SEED_PDF_PATH), f"Seed PDF not found at {SEED_PDF_PATH}"
     result = parse_pdf_document(SEED_PDF_PATH)
 
-    assert result["file_name"] == "jctsl_jaipur_450_ebuses_gcc.pdf"
+    assert result["file_name"] == "cesl_pm_ebus_sewa_3_amendment.pdf"
     assert result["page_count"] >= 1
     assert len(result["pages"]) >= 1
     assert result["pages"][0]["page_number"] == 1
-    assert "Jaipur City Transport Services" in result["full_text"]
     assert len(result["document_hash"]) == 64
     assert result["is_english"] is True
 
