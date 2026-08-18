@@ -100,10 +100,14 @@ class Tender(Base):
     timezone = Column(String(50), default="Asia/Kolkata", nullable=False)
 
     # EMD Resolution (Original vs Latest Amended)
+    # emd_amount holds the CUMULATIVE total across all lots (scalar, used for screening comparisons)
     emd_amount = Column(Numeric(15, 2), nullable=True)
     original_emd_amount = Column(Numeric(15, 2), nullable=True)
     latest_emd_amount = Column(Numeric(15, 2), nullable=True)
     latest_emd_source = Column(String(300), nullable=True)
+    # emd_breakdown holds the lot-wise structure as {"StateOrLot": amount_in_inr_crores, ...}
+    # Reflects actual CESL EMD which is always state/lot-wise, not a flat amount
+    emd_breakdown = Column(JSONType, nullable=True)
 
     document_fee = Column(Numeric(15, 2), nullable=True)
     scope_summary = Column(Text, nullable=True)

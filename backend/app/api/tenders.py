@@ -55,6 +55,7 @@ def format_tender_response(t: Tender) -> TenderResponse:
         days_remaining=days_remaining,
         is_expired=is_expired,
         emd_amount=float(t.emd_amount) if t.emd_amount else None,
+        emd_breakdown=t.emd_breakdown,
         document_fee=float(t.document_fee) if t.document_fee else None,
         scope_summary=t.scope_summary,
         source_url=t.source_url,

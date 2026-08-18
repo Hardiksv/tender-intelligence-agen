@@ -68,8 +68,9 @@ FAKE_CATALOG_ENTRY = {
         "original_bus_quantity": 3604,
         "latest_bus_quantity": 3604,
         "latest_quantity_source": "Original RFP",
-        "submission_deadline": "2026-09-02T15:00:00+05:30",
-        "emd_amount": 10_000_000.0,
+        "submission_deadline": "2026-06-05T14:30:00+05:30",
+        "emd_amount": 1_131_000_000.0,
+        "emd_breakdown": {"Lot 1 (Rajasthan)": 8.25, "Lot 2 (Telangana)": 5.62},
         "document_fee": 25_000.0,
         "source_url": "http://test.example.com/rfp.pdf"
     }
@@ -86,12 +87,12 @@ def minimal_parsed_doc():
         "page_count": 3,
         "pages": [
             {"page_number": 1, "text": "CESL. Selection of Bus Operator for 3604 Electric Buses."},
-            {"page_number": 2, "text": "EMD: Rs 1 Crore. Tender Fee: Rs 25000. Deadline: 02-Sep-2026."},
+            {"page_number": 2, "text": "EMD: Rs 113.10 Crore across 19 Lots. Tender Fee: Rs 25000. Deadline: 05-Jun-2026."},
             {"page_number": 3, "text": "Fleet size 80 buses required. Minimum turnover Rs 120 Crore. 5 years."},
         ],
         "full_text": (
             "CESL. Selection of Bus Operator for 3604 Electric Buses on GCC Basis.\n"
-            "EMD: Rs 1 Crore. Tender Fee: Rs 25000. Deadline: 02-Sep-2026.\n"
+            "EMD: Rs 113.10 Crore across 19 Lots. Tender Fee: Rs 25000. Deadline: 05-Jun-2026.\n"
             "Fleet size 80 buses required. Minimum turnover Rs 120 Crore. 5 years experience."
         ),
         "detected_language": "en",
@@ -115,8 +116,9 @@ def mock_extraction_result():
         issuing_authority="Convergence Energy Services Limited (CESL)",
         city="Pan-India",
         state="National",
-        submission_deadline="2026-09-02T15:00:00+05:30",
-        emd_amount=10_000_000.0,
+        submission_deadline="2026-06-05T14:30:00+05:30",
+        emd_amount=1_131_000_000.0,
+        emd_breakdown={"Lot 1 (Rajasthan)": 8.25, "Lot 2 (Telangana)": 5.62},
         document_fee=25_000.0,
         scope_summary="Operation and maintenance of 3604 electric buses on GCC basis.",
         eligibility=elig

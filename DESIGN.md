@@ -75,6 +75,32 @@ The system operates strictly over **100% authentic, publicly downloaded governme
 
 ---
 
+## Domain Data Modeling: Lot-Wise EMD & Deadline Resolution
+
+### 1. Lot-Wise / State-Wise EMD Modeling
+In central bus aggregation tenders issued by Convergence Energy Services Limited (CESL), Earnest Money Deposit (EMD) is **never a single flat fee**. Bidders are permitted to quote for one or more specific state/city lots, and the required bid security is the cumulative sum of EMD amounts corresponding to those participating lots.
+
+Our data model captures this dual-granularity faithfully:
+- **`Tender.emd_amount` (`Numeric(15, 2)`)**: Holds the true cumulative total EMD across all lots (e.g. ₹113.10 Cr for Tender 3, ₹134.82 Cr for PM E-DRIVE).
+- **`Tender.emd_breakdown` (`JSONB`)**: Stores the structured lot-wise mapping `{"Lot Name / State": amount_in_INR_crores, ...}` directly extracted from Section 1 (IFB) of the source RFP.
+- **`extraction_provenance` (`JSONB`)**: Traces both the scalar total and the lot breakdown back to the specific source document and page number.
+
+#### Ground Truth EMD & Submission Deadlines across Parent Tenders
+
+| Tender Program | Tender Reference | Verified Submission Deadline (Cutoff) | Techno-Commercial Opening | Cumulative EMD (`emd_amount`) | Lot-Wise Structure (`emd_breakdown`) |
+|---|---|---|---|---|---|
+| **PM-eBus Sewa Tender 3** (3,604 Buses) | `CESL/06/2026-27/PM-eBus Sewa3/262704003` | **05.06.2026 14:30 IST** | 05.06.2026 15:00 IST | **₹113.10 Cr** (`1,131,000,000.0`) | 19 Lots (e.g. Lot 1 Rajasthan ₹8.25 Cr, Lot 7 Karnataka ₹28.00 Cr, Lot 15 Kerala ₹11.48 Cr) |
+| **PM E-DRIVE Scheme** (6,230 Buses) | `CESL/06/2025-26/PM E-Drive/252601015` | **10.03.2026 14:30 IST** | 10.03.2026 15:00 IST | **₹134.82 Cr** (`1,348,200,000.0`) | 8 Lots (e.g. Lot 1 Pune ₹5.45 Cr, Lot 3 Mumbai ₹29.50 Cr, Lot 7 Delhi ₹37.20 Cr) |
+| **PM-eBus Sewa Tender 1** (3,600 / 3,725 Buses) | `CESL/06/2023-24/PM-eBusSewa/23241106` | **25.01.2024 14:30 IST** | 25.01.2024 15:00 IST | **₹91.89 Cr** (`918,900,000.0`) | 10 States (e.g. Maharashtra ₹37.61 Cr, Bihar ₹10.99 Cr, Gujarat ₹10.21 Cr) |
+| **PM-eBus Sewa Tender 2** (4,588 / 3,132 Buses) | `CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013` | **15.11.2024 14:00 IST** | 15.11.2024 15:00 IST | **₹127.55 Cr** (`1,275,500,000.0`) | 21 Lots across Package 1 (₹114.15 Cr) & Package 2 (₹13.40 Cr) |
+
+### 2. Submission Cutoff vs. Opening Time Clarification
+Government RFPs distinguish between:
+1. **Online Bid Submission Period End Time** (e.g., 05.06.2026 up to 14:30 IST): The strict deadline by which all encrypted bids must be uploaded to the portal.
+2. **Techno-Commercial E-Bid Opening Time** (e.g., 05.06.2026 at 15:00 IST): When the procurement committee opens the first envelope.
+
+`submission_deadline` in our schema strictly represents the **bid submission cutoff (14:30 IST)** as this is the operational constraint for bidders.
+
 ## Technology Choices & Design Rationale
 
 ### 1. Agent Orchestration (Explicit Hand-Rolled Loop)

@@ -112,7 +112,18 @@ def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
             vectors = []
 
     if not vectors:
-        vectors = [generate_embedding(t) for t in texts]
+        try:
+            st_model = _get_sentence_transformer()
+            raw_batch = st_model.encode(texts, convert_to_numpy=True).tolist()
+            for raw in raw_batch:
+                if len(raw) == settings.EMBEDDING_DIMENSION:
+                    vectors.append(raw)
+                else:
+                    multiplier = (settings.EMBEDDING_DIMENSION // len(raw)) + 1
+                    vectors.append((raw * multiplier)[:settings.EMBEDDING_DIMENSION])
+        except Exception as e:
+            logger.warning(f"Batch SentenceTransformer fallback error: {e}. Generating fallback vectors.")
+            vectors = [_generate_fallback_vector(t, settings.EMBEDDING_DIMENSION) for t in texts]
 
     for idx, vec in enumerate(vectors):
         if len(vec) != settings.EMBEDDING_DIMENSION:

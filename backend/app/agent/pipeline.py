@@ -52,8 +52,29 @@ CATALOG = {
         "original_bus_quantity": 3604,
         "latest_bus_quantity": 3604,
         "latest_quantity_source": "Original RFP",
-        "submission_deadline": "2026-09-02T15:00:00+05:30",
-        "emd_amount": 10000000.0,
+        "submission_deadline": "2026-06-05T14:30:00+05:30",
+        "emd_amount": 1131000000.0,
+        "emd_breakdown": {
+            "Lot 1 (Rajasthan)": 8.25,
+            "Lot 2 (Telangana)": 5.62,
+            "Lot 3 (Gujarat)": 6.36,
+            "Lot 4 (Madhya Pradesh)": 10.00,
+            "Lot 5 (Andhra Pradesh)": 8.23,
+            "Lot 6 (Chandigarh)": 10.66,
+            "Lot 7 (Karnataka)": 28.00,
+            "Lot 8 (Punjab)": 12.90,
+            "Lot 9 (Goa)": 1.43,
+            "Lot 10 (Arunachal Pradesh)": 0.86,
+            "Lot 11 (Dadar Nagar Haveli)": 1.35,
+            "Lot 12 (Andaman & Nicobar)": 1.57,
+            "Lot 13 (Himachal Pradesh)": 1.56,
+            "Lot 14 (Manipur)": 0.61,
+            "Lot 15 (Kerala)": 11.48,
+            "Lot 16 (Jammu & Kashmir)": 1.77,
+            "Lot 17 (Ladakh)": 1.18,
+            "Lot 18 (Arunachal Pradesh)": 0.48,
+            "Lot 19 (Manipur)": 0.79
+        },
         "document_fee": 25000.0,
         "source_url": "http://www.convergence.co.in/public/upload/tender_pdf/x845qy239kcl5sk8ld.pdf"
     },
@@ -76,8 +97,18 @@ CATALOG = {
         "original_bus_quantity": 6230,
         "latest_bus_quantity": 6230,
         "latest_quantity_source": "Original RFP",
-        "submission_deadline": "2026-03-10T15:00:00+05:30",
-        "emd_amount": 15000000.0,
+        "submission_deadline": "2026-03-10T14:30:00+05:30",
+        "emd_amount": 1348200000.0,
+        "emd_breakdown": {
+            "Lot 1 (Pune)": 5.45,
+            "Lot 2 (Pune)": 25.94,
+            "Lot 3 (Mumbai)": 29.50,
+            "Lot 4 (Ahmedabad)": 4.54,
+            "Lot 5 (Hyderabad)": 6.09,
+            "Lot 6 (Delhi)": 14.70,
+            "Lot 7 (Delhi)": 37.20,
+            "Lot 8 (Delhi)": 11.40
+        },
         "document_fee": 25000.0,
         "source_url": "http://www.convergence.co.in/public/images/1978.pdf"
     },
@@ -93,8 +124,20 @@ CATALOG = {
         "original_bus_quantity": 3600,
         "latest_bus_quantity": 3600,
         "latest_quantity_source": "Original RFP",
-        "submission_deadline": "2024-01-25T15:00:00+05:30",
-        "emd_amount": 10000000.0,
+        "submission_deadline": "2024-01-25T14:30:00+05:30",
+        "emd_amount": 918900000.0,
+        "emd_breakdown": {
+            "Bihar": 10.99,
+            "Chandigarh": 3.09,
+            "Gujarat": 10.21,
+            "Haryana": 4.80,
+            "J&K": 4.78,
+            "Maharashtra": 37.61,
+            "Meghalaya": 1.06,
+            "Odisha": 8.83,
+            "Puducherry": 2.14,
+            "Punjab": 8.38
+        },
         "document_fee": 25000.0,
         "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/10/1919-1.pdf"
     },
@@ -119,8 +162,31 @@ CATALOG = {
         "original_bus_quantity": 4588,
         "latest_bus_quantity": 3132,
         "latest_quantity_source": "Amendment No. 11 (Ref: CESL/06/2023-24/PM E Bus/ Phase II/ 2324003013/ Amdt-11 Dated 29.10.2024)",
-        "submission_deadline": "2024-11-15T15:00:00+05:30",
-        "emd_amount": 10000000.0,
+        "submission_deadline": "2024-11-15T14:00:00+05:30",
+        "emd_amount": 1275500000.0,
+        "emd_breakdown": {
+            "Package 1 - Ladakh": 0.41,
+            "Package 1 - Madhya Pradesh": 12.39,
+            "Package 1 - Chhattisgarh": 5.20,
+            "Package 1 - Rajasthan": 17.23,
+            "Package 1 - Uttarakhand": 2.60,
+            "Package 1 - Punjab": 8.48,
+            "Package 1 - Meghalaya": 0.57,
+            "Package 1 - Bihar": 12.15,
+            "Package 1 - Puducherry": 2.50,
+            "Package 1 - Gujarat": 11.71,
+            "Package 1 - Haryana": 12.00,
+            "Package 1 - Maharashtra": 3.32,
+            "Package 1 - Andhra Pradesh": 25.59,
+            "Package 2 - Madhya Pradesh (7m)": 2.68,
+            "Package 2 - Chhattisgarh (7m)": 0.83,
+            "Package 2 - Uttarakhand (7m)": 0.88,
+            "Package 2 - J&K (7m)": 1.84,
+            "Package 2 - Maharashtra (7m)": 3.94,
+            "Package 2 - Odisha (7m)": 1.42,
+            "Package 2 - Meghalaya (7m)": 0.79,
+            "Package 2 - Punjab (7m)": 1.02
+        },
         "document_fee": 25000.0,
         "source_url": "https://pm-ebus-sewa.mohua.gov.in/wp-content/uploads/2025/11/CESL-PM-eBus-Sewa-Tender-2-Amend-11_Clear-Copy-1.pdf"
     },
@@ -251,6 +317,8 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: Optional[List[str]] = 
                         emd_amount=parent_meta.get("emd_amount"),
                         original_emd_amount=parent_meta.get("emd_amount"),
                         latest_emd_amount=parent_meta.get("emd_amount"),
+                        latest_emd_source=parent_meta.get("latest_quantity_source"),
+                        emd_breakdown=parent_meta.get("emd_breakdown"),
                         document_fee=parent_meta.get("document_fee"),
                         scope_summary=parent_meta["title"],
                         source_url=parent_meta.get("source_url"),
@@ -266,6 +334,7 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: Optional[List[str]] = 
                             },
                             "emd_amount": {
                                 "value": parent_meta.get("emd_amount"),
+                                "breakdown": parent_meta.get("emd_breakdown"),
                                 "source_document": file_name,
                                 "page_number": 1
                             }
@@ -275,12 +344,29 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: Optional[List[str]] = 
                     db.flush()
                     logger.info(f"Created Parent Tender Opportunity: {tender_ref}")
                 else:
+                    # Refresh parent metadata & EMD/deadline values on re-ingestion
+                    parent_meta = meta if meta["is_parent"] else next((m for m in CATALOG.values() if m.get("tender_ref") == tender_ref and m.get("is_parent")), meta)
+                    deadline_dt = datetime.fromisoformat(parent_meta["submission_deadline"])
+                    tender.submission_deadline = deadline_dt
+                    tender.original_deadline = deadline_dt
+                    tender.latest_deadline = deadline_dt
+                    tender.emd_amount = parent_meta.get("emd_amount")
+                    tender.original_emd_amount = parent_meta.get("emd_amount")
+                    tender.latest_emd_amount = parent_meta.get("emd_amount")
+                    tender.emd_breakdown = parent_meta.get("emd_breakdown")
+                    if not tender.extraction_provenance:
+                        tender.extraction_provenance = {}
+                    tender.extraction_provenance["emd_amount"] = {
+                        "value": parent_meta.get("emd_amount"),
+                        "breakdown": parent_meta.get("emd_breakdown"),
+                        "source_document": file_name,
+                        "page_number": 1
+                    }
+
                     # Update parent tender if amendment introduces a latest value
                     if "latest_bus_quantity" in meta and not meta["is_parent"]:
                         tender.latest_bus_quantity = meta["latest_bus_quantity"]
                         tender.latest_quantity_source = meta.get("latest_quantity_source", meta.get("amendment_number"))
-                        if not tender.extraction_provenance:
-                            tender.extraction_provenance = {}
                         tender.extraction_provenance["bus_quantity"] = {
                             "original_value": tender.original_bus_quantity,
                             "latest_value": meta["latest_bus_quantity"],

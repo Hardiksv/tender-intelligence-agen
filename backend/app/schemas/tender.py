@@ -35,6 +35,7 @@ class TenderResponse(BaseModel):
     days_remaining: int
     is_expired: bool
     emd_amount: Optional[float] = None
+    emd_breakdown: Optional[Dict[str, float]] = None
     document_fee: Optional[float] = None
     scope_summary: Optional[str] = None
     source_url: Optional[str] = None

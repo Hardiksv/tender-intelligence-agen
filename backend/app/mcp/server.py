@@ -106,6 +106,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                     "state": t.state,
                     "submission_deadline": t.submission_deadline.isoformat(),
                     "emd_amount": float(t.emd_amount) if t.emd_amount else None,
+                    "emd_breakdown": t.emd_breakdown,
                     "verdict": verdict
                 })
 
@@ -147,6 +148,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                 "state": t.state,
                 "submission_deadline": t.submission_deadline.isoformat(),
                 "emd_amount": float(t.emd_amount) if t.emd_amount else None,
+                "emd_breakdown": t.emd_breakdown,
                 "scope_summary": t.scope_summary,
                 "eligibility": eligibility_data,
                 "screening": screening_data
