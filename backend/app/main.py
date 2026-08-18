@@ -248,5 +248,16 @@ async def ingest_alias(background_tasks: BackgroundTasks, db = Depends(get_db)):
     return await ingestion.trigger_ingestion_run(background_tasks, db=db)
 
 
+@app.get("/api/debug-routing", tags=["Debug"])
+async def debug_routing(request: Request):
+    """Debug endpoint to inspect exact ASGI path and headers received from Vercel."""
+    return {
+        "url_path": request.url.path,
+        "scope_path": request.scope.get("path"),
+        "scope_raw_path": request.scope.get("raw_path", b"").decode("utf-8", errors="replace"),
+        "query_string": request.scope.get("query_string", b"").decode("utf-8", errors="replace"),
+        "headers": {k.decode("utf-8", errors="replace"): v.decode("utf-8", errors="replace") for k, v in request.scope.get("headers", [])}
+    }
+
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
