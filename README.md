@@ -77,14 +77,16 @@ curl -X POST http://localhost:8000/api/ingestion/run
 
 ---
 
-## Live Demo & Deployment
+## Live Demo & Production URLs
 
-| Service | Platform | Status |
+| Service | Platform | Live Production URL |
 |---|---|---|
-| Frontend Web UI | Vercel | Connect repo $\to$ Root `frontend` $\to$ Deploy |
-| Backend REST API | Container / Cloud | FastAPI + pgvector |
+| **Frontend Web Application** | Vercel | [https://tender-intelligence-agen.vercel.app](https://tender-intelligence-agen.vercel.app) |
+| **Backend REST API Root** | Vercel | [https://tender-backend-pi.vercel.app](https://tender-backend-pi.vercel.app) |
+| **Interactive API Documentation** | Swagger UI | [https://tender-backend-pi.vercel.app/docs](https://tender-backend-pi.vercel.app/docs) |
+| **Health Check Endpoint** | Vercel | [https://tender-backend-pi.vercel.app/health](https://tender-backend-pi.vercel.app/health) |
 
-> To deploy your frontend in 1 click, follow the Vercel step-by-step guide below.
+> Both Frontend and Backend are deployed and linked on Vercel with automatic continuous deployment from GitHub `main`.
 
 ---
 
