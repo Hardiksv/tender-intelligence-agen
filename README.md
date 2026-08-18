@@ -77,57 +77,47 @@ curl -X POST http://localhost:8000/api/ingestion/run
 
 ---
 
-## Live Demo
+## Live Demo & Deployment
 
-| Service | URL |
-|---|---|
-| Frontend Web UI | *(Render deploy in progress — URL will be updated here once live)* |
-| Backend REST API + Swagger | *(Render deploy in progress — URL will be updated here once live)* |
+| Service | Platform | Status |
+|---|---|---|
+| Frontend Web UI | Vercel | Connect repo $\to$ Root `frontend` $\to$ Deploy |
+| Backend REST API | Container / Cloud | FastAPI + pgvector |
 
-> To deploy your own instance, follow the Render step-by-step guide below.
+> To deploy your frontend in 1 click, follow the Vercel step-by-step guide below.
 
 ---
 
 ## Cloud Deployment
 
-### Step-by-Step Deploy on Render (Free Tier)
+### Step-by-Step Deploy on Vercel
 
-> Estimated time: under 10 minutes. `render.yaml` in this repo defines the full 3-service blueprint (PostgreSQL + pgvector, FastAPI backend, React frontend).
+> Estimated time: under 3 minutes. The React + Vite frontend is pre-configured with `frontend/vercel.json` for automatic Single-Page Application (SPA) routing.
 
-**Step 1 — Create a Render account:**
-Go to [https://render.com](https://render.com) and sign up (free, GitHub login works).
+**Step 1 — Login to Vercel:**
+Go to [https://vercel.com](https://vercel.com) and log in with your account.
 
-**Step 2 — Connect GitHub repository:**
-- Dashboard → New → Blueprint
-- Select the `Hardiksv/tender-intelligence-agen` repository
-- Render detects `render.yaml` automatically and shows 3 services to create
+**Step 2 — Import GitHub Repository:**
+- In the Vercel Dashboard, click **"Add New..."** $\to$ **"Project"**
+- Select the `Hardiksv/tender-intelligence-agen` repository from your GitHub account and click **"Import"**
 
-**Step 3 — Set the secret environment variable:**
-- Before clicking Deploy, set `LLM_API_KEY` → your Gemini API key
-- All other env vars (DATABASE_URL, LLM_MODEL, EMBEDDING_MODEL, EMBEDDING_DIMENSION) are pre-configured in `render.yaml`
+**Step 3 — Configure Project Settings:**
+- **Framework Preset:** Vite
+- **Root Directory:** Click `Edit` and select `frontend`
+- **Build Command:** `npm run build` (detected automatically)
+- **Output Directory:** `dist` (detected automatically)
+- **Install Command:** `npm install` (detected automatically)
 
-**Step 4 — Click "Apply Blueprint":**
-- Render provisions PostgreSQL (with pgvector extension enabled automatically on Render managed Postgres)
-- Runs `cd backend && pip install -r requirements.txt`
-- Starts backend: `cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`
-- Builds React frontend with `cd frontend && npm install && npm run build`
+**Step 4 — Add Environment Variables (Optional / Backend URL):**
+- Under **Environment Variables**:
+  - `VITE_API_URL` $\to$ `https://your-backend-api-url.com` (point to your deployed backend API, or leave empty if testing against a reverse proxy)
 
-**Step 5 — Run migrations and seed ingestion:**
-```bash
-# After deploy, open backend Render console (Dashboard → tender-backend → Shell)
-cd backend && alembic upgrade head
+**Step 5 — Click "Deploy":**
+- Vercel builds the React frontend in ~30 seconds and assigns a production `.vercel.app` URL.
 
-# Then trigger ingestion from the API:
-curl -X POST https://YOUR-BACKEND-URL.onrender.com/api/ingestion/run
-```
+---
 
-**Step 6 — Access the live app:**
-- Frontend URL: `https://tender-frontend.onrender.com` (or your Render-assigned subdomain)
-- Backend docs: `https://YOUR-BACKEND-URL.onrender.com/docs`
-
-> **Cold-start note:** Render free tier services sleep after 15 minutes of inactivity. First request after sleep takes ~30 seconds to wake up. This is expected for free deployments.
-
-### Railway / Docker (Self-hosted Alternative)
+### Docker / Self-hosted Deployment
 Deploy directly using the included `Dockerfile` in `backend/` and `frontend/`:
 ```bash
 docker compose up -d
