@@ -116,8 +116,11 @@ def retrieve_relevant_context(
                 emb = chunk.embedding
                 if isinstance(emb, list):
                     emb_arr = np.array(emb, dtype=np.float32)
-                    denom = q_norm * np.linalg.norm(emb_arr)
-                    sim = float(np.dot(q_arr, emb_arr) / denom) if denom > 0 else 0.0
+                    if len(q_arr) == len(emb_arr):
+                        denom = q_norm * np.linalg.norm(emb_arr)
+                        sim = float(np.dot(q_arr, emb_arr) / denom) if denom > 0 else 0.0
+                    else:
+                        sim = 0.5
                     scored_rows.append((sim, chunk, title, file_name))
             
             scored_rows.sort(key=lambda x: x[0], reverse=True)
