@@ -15,16 +15,21 @@ from app.core.exceptions import (
 from app.api import tenders, screening, profile, chat, ingestion
 from app.db.database import get_db
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown."""
+    logger.info("Tender Intelligence API started.")
+    yield
+    logger.info("Tender Intelligence API stopped.")
+
 app = FastAPI(
     title="Tender Intelligence Agent API",
     description="Production-grade AI pipeline for public Bus Operations tender analysis, screening, and RAG Q&A",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
-
-@app.on_event("startup")
-async def startup_event():
-    """Startup lifecycle event."""
-    logger.info("Tender Intelligence API started.")
 
 # CORS Configuration
 origins = [

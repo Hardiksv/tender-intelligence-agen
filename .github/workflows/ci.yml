@@ -28,9 +28,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/tender_test
       LLM_API_KEY: mock_key_for_testing
-      LLM_MODEL: gemini/gemini-2.5-flash
-      LLM_FALLBACK_MODEL: gemini/gemini-2.5-pro
-      EMBEDDING_MODEL: gemini/text-embedding-004
+      LLM_MODEL: gemini/gemini-flash-latest
+      LLM_FALLBACK_MODEL: gemini/gemini-2.5-flash-lite
+      EMBEDDING_MODEL: gemini/gemini-embedding-001
       EMBEDDING_DIMENSION: "768"
       TIMEZONE: Asia/Kolkata
       FRONTEND_ORIGIN: http://localhost:5173

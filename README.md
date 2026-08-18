@@ -164,7 +164,9 @@ cd backend
 python -m pytest tests/ -o pythonpath=. -v
 ```
 
-**Automated Test Suite (30/30 Tests Passing):**
+**Automated Test Suite (38/38 Tests Passing):**
+- `test_embedding_migration.py` — Gemini embedding 768-dim validation, batch processing, and DB insertion.
+- `test_emd_and_deadline_catalog.py` — Catalog deadlines, EMD lot breakdown, and deterministic screening.
 - `test_pipeline_orchestration.py` — Ingestion → extraction → screening agent loop, fallback handling, and DB idempotency.
 - `test_pdf_parser.py` — Multi-page extraction, SHA-256 hashing, non-English guardrails.
 - `test_extraction.py` — Currency normalization, metric standardization, schema validation.
