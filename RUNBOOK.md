@@ -184,7 +184,7 @@ python backend/app/mcp/server.py
         "DATABASE_URL": "postgresql://postgres:YOUR_PASSWORD@localhost:5432/tender_db",
         "LLM_API_KEY": "YOUR_GEMINI_API_KEY",
         "LLM_MODEL": "gemini/gemini-2.5-flash",
-        "EMBEDDING_MODEL": "gemini/text-embedding-004",
+        "EMBEDDING_MODEL": "gemini/gemini-embedding-001",
         "EMBEDDING_DIMENSION": "768",
         "TIMEZONE": "Asia/Kolkata"
       }
@@ -247,7 +247,7 @@ EmbeddingDimensionMismatchError: Received embedding of dimension 1536 but table 
 **Fix:**
 ```bash
 # Step 1 — Verify your .env values match each other
-# EMBEDDING_MODEL=gemini/text-embedding-004 → dimension 768
+# EMBEDDING_MODEL=gemini/gemini-embedding-001 → dimension 768
 # EMBEDDING_MODEL=openai/text-embedding-ada-002 → dimension 1536
 
 # Step 2 — If dimension mismatch, reset migrations and re-ingest

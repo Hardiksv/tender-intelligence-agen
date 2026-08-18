@@ -33,8 +33,9 @@ def _generate_fallback_vector(text: str, dimension: int) -> List[float]:
 
 def generate_embedding(text: str) -> List[float]:
     """
-    Generates embedding vector for input text supporting Gemini (text-embedding-004),
+    Generates embedding vector for input text supporting Gemini (gemini-embedding-001),
     Groq, and local SentenceTransformer models with dimension validation.
+    Explicitly requests output_dimensionality matching settings.EMBEDDING_DIMENSION (768).
     """
     if not text or not text.strip():
         text = "empty"
@@ -48,8 +49,9 @@ def generate_embedding(text: str) -> List[float]:
             response = litellm.embedding(
                 model=model_name,
                 input=[text],
+                dimensions=settings.EMBEDDING_DIMENSION,
                 api_key=settings.LLM_API_KEY,
-                timeout=5.0
+                timeout=10.0
             )
             raw = response.data[0]["embedding"]
             if len(raw) == settings.EMBEDDING_DIMENSION:
@@ -84,7 +86,10 @@ def generate_embedding(text: str) -> List[float]:
 
 
 def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
-    """Generates embedding vectors for a batch of text chunks."""
+    """
+    Generates embedding vectors for a batch of text chunks with explicit
+    dimensions=settings.EMBEDDING_DIMENSION constraint.
+    """
     if not texts:
         return []
 
@@ -97,8 +102,9 @@ def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
             response = litellm.embedding(
                 model=model_name,
                 input=texts,
+                dimensions=settings.EMBEDDING_DIMENSION,
                 api_key=settings.LLM_API_KEY,
-                timeout=5.0
+                timeout=15.0
             )
             for item in response.data:
                 raw = item["embedding"]
@@ -108,7 +114,7 @@ def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
                     multiplier = (settings.EMBEDDING_DIMENSION // len(raw)) + 1
                     vectors.append((raw * multiplier)[:settings.EMBEDDING_DIMENSION])
         except Exception as e:
-            logger.warning(f"Batch cloud embedding failed: {e}. Falling back to sequential generation.")
+            logger.warning(f"Batch cloud embedding failed: {e}. Falling back to local batch generation.")
             vectors = []
 
     if not vectors:

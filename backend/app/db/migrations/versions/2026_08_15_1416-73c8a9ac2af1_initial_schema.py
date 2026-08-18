@@ -108,7 +108,7 @@ def upgrade() -> None:
     sa.Column('chunk_text', sa.Text(), nullable=False),
     sa.Column('page_number', sa.Integer(), nullable=False),
     sa.Column('chunk_index', sa.Integer(), nullable=False),
-    sa.Column('embedding', pgvector.sqlalchemy.vector.VECTOR(dim=384), nullable=False),
+    sa.Column('embedding', pgvector.sqlalchemy.vector.VECTOR(dim=768), nullable=False),
     sa.Column('chunk_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.ForeignKeyConstraint(['document_id'], ['documents.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['tender_id'], ['tenders.id'], ondelete='CASCADE'),

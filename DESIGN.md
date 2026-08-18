@@ -16,7 +16,7 @@ FastAPI (Python 3.11 Backend)
 │  ├── Normalization (INR Currency & Metric Conversion)       │
 │  ├── Screening Engine (Strict Deterministic Python Rules)   │
 │  ├── Page-Aware Chunking (Paragraph Preservation)           │
-│  ├── Embeddings (Gemini text-embedding-004 & Local Fallback)│
+│  ├── Embeddings (Gemini gemini-embedding-001 & Local Fallback)│
 │  ├── Retrieval (Hybrid SQL Date Router + Vector Search)     │
 │  ├── Grounded RAG (Zero-Hallucination & Provenance Citations│
 │  └── Automated Discovery & MCP Server                       │

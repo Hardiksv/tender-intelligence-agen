@@ -13,11 +13,16 @@ Always cite the specific tender title, issuing authority, and document facts fro
 If the context does not contain sufficient details, state: 'I could not find sufficient evidence in the stored tender documents to answer this confidently.'
 
 CONTEXT:
-__CONTEXT__
+{context}
 
 QUESTION:
-__QUESTION__
+{question}
 """
+
+
+def load_rag_prompt() -> str:
+    """Returns RAG prompt template."""
+    return RAG_PROMPT_TEMPLATE
 
 
 def answer_tender_question(db: Session, request: ChatRequest) -> ChatResponse:
@@ -67,7 +72,7 @@ def answer_tender_question(db: Session, request: ChatRequest) -> ChatResponse:
         ))
 
     context_str = "\n".join(formatted_context_list)
-    prompt = RAG_PROMPT_TEMPLATE.replace("__CONTEXT__", context_str).replace("__QUESTION__", request.question)
+    prompt = RAG_PROMPT_TEMPLATE.replace("{context}", context_str).replace("{question}", request.question)
 
     try:
         # Call LLM for grounded completion over genuine retrieved context

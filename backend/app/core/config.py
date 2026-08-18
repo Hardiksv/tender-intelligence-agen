@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     LLM_FALLBACK_MODEL: str = "gemini/gemini-3.1-pro-preview"
 
     # Embeddings Settings
-    EMBEDDING_MODEL: str = "gemini/embedding-001"
+    EMBEDDING_MODEL: str = "gemini/gemini-embedding-001"
     EMBEDDING_DIMENSION: int = 768
 
     # Application Settings
