@@ -79,6 +79,17 @@ app.include_router(chat.router)
 app.include_router(ingestion.router)
 
 # Root-level Route Aliases for assignment compliance
+@app.get("/", tags=["Root"])
+async def root_index():
+    """Root status endpoint."""
+    return {
+        "status": "online",
+        "app": "Tender Intelligence Agent API",
+        "version": "1.0.0",
+        "docs_url": "/docs",
+        "health_url": "/health"
+    }
+
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Basic health check endpoint."""

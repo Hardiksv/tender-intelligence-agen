@@ -9,11 +9,11 @@ class Settings(BaseSettings):
     No hardcoded production settings reside in code.
     """
     # Database Settings
-    DATABASE_URL: str
+    DATABASE_URL: str = "sqlite:///tender_intelligence.db"
     TEST_DATABASE_URL: Optional[str] = None
 
     # LLM Settings (LiteLLM)
-    LLM_API_KEY: str
+    LLM_API_KEY: str = ""
     LLM_MODEL: str = "gemini/gemini-2.5-flash"
     LLM_FALLBACK_MODEL: str = "gemini/gemini-2.5-pro"
 
