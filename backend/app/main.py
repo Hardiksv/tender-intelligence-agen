@@ -195,8 +195,6 @@ app.include_router(ingestion.router)
 @app.get("/", tags=["Root"])
 @app.get("/api", tags=["Root"])
 @app.get("/api/", tags=["Root"])
-@app.get("/api/index", tags=["Root"])
-@app.get("/api/index.py", tags=["Root"])
 async def root_index():
     """Root status endpoint."""
     return {
