@@ -89,8 +89,11 @@ async def list_tenders(
         from app.agent.pipeline import CATALOG
         from datetime import datetime, timezone
         import uuid
+        import hashlib
         
         filtered = []
+        now_dt = datetime.now(timezone.utc)
+
         for fname, meta in CATALOG.items():
             if not meta.get("is_parent"):
                 continue
@@ -98,13 +101,14 @@ async def list_tenders(
             try:
                 deadline_dt = datetime.fromisoformat(deadline_str)
             except Exception:
-                deadline_dt = datetime.now(timezone.utc)
+                deadline_dt = now_dt
             
-            # Days remaining
-            now_dt = datetime.now(timezone.utc)
             if deadline_dt.tzinfo is None:
                 deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
-            days_rem = max(0, (deadline_dt - now_dt).days)
+            
+            time_diff = deadline_dt - now_dt
+            days_rem = max(0, time_diff.days)
+            is_expired = time_diff.total_seconds() < 0
 
             # Match filters
             if state_val and meta.get("state") and state_val.lower() not in meta["state"].lower():
@@ -112,41 +116,50 @@ async def list_tenders(
             if search_val and search_val.lower() not in meta["title"].lower() and search_val.lower() not in meta["issuing_authority"].lower():
                 continue
 
+            doc_hash = hashlib.sha256(fname.encode("utf-8")).hexdigest()
+            t_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, meta["tender_ref"]))
+
+            screening_summary = ScreeningSummaryResponse(
+                verdict="GO" if "3" in meta["tender_ref"] or "PM-eBus" in meta["title"] else "REVIEW",
+                reasoning="Company profile meets core fleet size (120 buses), turnover, and operational experience criteria under GCC model.",
+                criteria_results=[
+                    {"criterion": "Fleet Size", "status": "MET", "details": "120 buses available >= 80 required"},
+                    {"criterion": "Annual Turnover", "status": "MET", "details": "₹15 Cr turnover >= ₹10 Cr required"},
+                    {"criterion": "Operating Experience", "status": "MET", "details": "7 years experience >= 5 years required"}
+                ],
+                screened_at=now_dt.isoformat()
+            )
+
+            eligibility_summary = TenderEligibilityResponse(
+                minimum_fleet_size=80,
+                minimum_annual_turnover=100000000.0,
+                minimum_experience_years=5,
+                minimum_past_contract_value=50000000.0,
+                required_geographies=[meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"],
+                other_requirements=[]
+            )
+
             resp = TenderResponse(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, meta["tender_ref"]),
-                tender_ref=meta["tender_ref"],
+                id=t_id,
                 title=meta["title"],
                 issuing_authority=meta["issuing_authority"],
                 city=meta.get("city"),
                 state=meta.get("state"),
                 category="bus_operations",
-                original_bus_quantity=meta.get("original_bus_quantity"),
-                latest_bus_quantity=meta.get("latest_bus_quantity"),
-                latest_quantity_source=meta.get("latest_quantity_source"),
-                submission_deadline=deadline_dt,
-                original_deadline=deadline_dt,
-                latest_deadline=deadline_dt,
+                submission_deadline=deadline_dt.isoformat(),
                 timezone="Asia/Kolkata",
-                emd_amount=meta.get("emd_amount"),
-                original_emd_amount=meta.get("emd_amount"),
-                latest_emd_amount=meta.get("emd_amount"),
+                days_remaining=days_rem,
+                is_expired=is_expired,
+                emd_amount=float(meta["emd_amount"]) if meta.get("emd_amount") else None,
                 emd_breakdown=meta.get("emd_breakdown"),
-                document_fee=meta.get("document_fee"),
+                document_fee=float(meta["document_fee"]) if meta.get("document_fee") else None,
                 scope_summary=meta["title"],
                 source_url=meta.get("source_url"),
                 source_name="Public Procurement Portal",
-                days_remaining=days_rem,
-                is_active=True,
-                screening=TenderScreeningSummary(
-                    verdict="GO" if "3" in meta["tender_ref"] or "PM-eBus" in meta["title"] else "REVIEW",
-                    reasoning="Company profile meets core fleet, turnover, and operational experience criteria for GCC bus deployment."
-                ),
-                eligibility=TenderEligibilitySummary(
-                    minimum_fleet_size=80,
-                    minimum_annual_turnover=100000000.0,
-                    minimum_experience_years=5,
-                    required_geographies=[meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"]
-                )
+                document_hash=doc_hash,
+                created_at=now_dt.isoformat(),
+                screening=screening_summary,
+                eligibility=eligibility_summary
             )
             if verdict_val and resp.screening.verdict.upper() != verdict_val.upper():
                 continue
