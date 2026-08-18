@@ -7,17 +7,17 @@ from app.llm.client import llm_client
 from app.schemas.chat import ChatRequest, ChatResponse, Citation
 from app.services.retrieval import retrieve_relevant_context
 
-PROMPT_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "prompts", "rag.md"
-)
+RAG_PROMPT_TEMPLATE = """You are a grounded Tender Intelligence AI assistant.
+Answer the user's question strictly using ONLY the provided tender document context.
+Always cite the specific tender title, issuing authority, and document facts from the context.
+If the context does not contain sufficient details, state: 'I could not find sufficient evidence in the stored tender documents to answer this confidently.'
 
+CONTEXT:
+__CONTEXT__
 
-def load_rag_prompt() -> str:
-    if os.path.exists(PROMPT_PATH):
-        with open(PROMPT_PATH, "r", encoding="utf-8") as f:
-            return f.read()
-    return "Answer the question strictly based on context. If missing, say 'I could not find sufficient evidence in the stored tender documents to answer this confidently.'"
+QUESTION:
+__QUESTION__
+"""
 
 
 def answer_tender_question(db: Session, request: ChatRequest) -> ChatResponse:
@@ -25,12 +25,16 @@ def answer_tender_question(db: Session, request: ChatRequest) -> ChatResponse:
     RAG service answering user questions grounded strictly in retrieved vector/SQL chunks
     and returning metadata-backed citations. No synthetic or hallucinated answers.
     """
-    context_chunks = retrieve_relevant_context(
-        db=db,
-        question=request.question,
-        tender_id_filter=request.tender_id,
-        top_k=5
-    )
+    try:
+        context_chunks = retrieve_relevant_context(
+            db=db,
+            question=request.question,
+            tender_id_filter=request.tender_id,
+            top_k=5
+        )
+    except Exception as e:
+        logger.warning(f"Error in retrieve_relevant_context: {e}")
+        context_chunks = []
 
     if not context_chunks:
         return ChatResponse(
@@ -63,8 +67,7 @@ def answer_tender_question(db: Session, request: ChatRequest) -> ChatResponse:
         ))
 
     context_str = "\n".join(formatted_context_list)
-    prompt_template = load_rag_prompt()
-    prompt = prompt_template.format(question=request.question, context=context_str)
+    prompt = RAG_PROMPT_TEMPLATE.replace("__CONTEXT__", context_str).replace("__QUESTION__", request.question)
 
     try:
         # Call LLM for grounded completion over genuine retrieved context
