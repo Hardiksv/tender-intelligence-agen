@@ -14,8 +14,8 @@ class Settings(BaseSettings):
 
     # LLM Settings (LiteLLM)
     LLM_API_KEY: str = ""
-    LLM_MODEL: str = "gemini/gemini-2.5-flash"
-    LLM_FALLBACK_MODEL: str = "gemini/gemini-1.5-flash"
+    LLM_MODEL: str = "gemini/gemini-3.6-flash"
+    LLM_FALLBACK_MODEL: str = "gemini/gemini-3.1-pro-preview"
 
     # Embeddings Settings
     EMBEDDING_MODEL: str = "gemini/embedding-001"

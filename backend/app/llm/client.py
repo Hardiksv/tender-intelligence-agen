@@ -62,10 +62,10 @@ class LiteLLMClient(AbstractLLMClient):
 
         # Try models in priority order
         models_to_try = [
+            "gemini/gemini-3.6-flash",
+            "gemini/gemini-3.1-pro-preview",
             self.primary_model,
             self.fallback_model,
-            "gemini/gemini-1.5-flash",
-            "gemini/gemini-2.0-flash",
             "gemini/gemini-2.5-flash"
         ]
         # Remove duplicates preserving order
