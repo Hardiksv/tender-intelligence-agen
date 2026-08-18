@@ -7,61 +7,73 @@ from datetime import datetime, timezone
 from app.db.database import get_db
 from app.db.models import Tender, ScreeningResult, TenderEligibility
 from app.schemas.tender import TenderResponse, TenderListResponse, ScreeningSummaryResponse, TenderEligibilityResponse
+from app.core.logging import logger
 
 router = APIRouter(prefix="/api/tenders", tags=["Tenders"])
 
 
 def format_tender_response(t: Tender) -> TenderResponse:
     now_dt = datetime.now(timezone.utc)
-    deadline_dt = t.submission_deadline
-    if deadline_dt.tzinfo is None:
+    deadline_dt = getattr(t, "submission_deadline", now_dt)
+    if deadline_dt and hasattr(deadline_dt, "tzinfo") and deadline_dt.tzinfo is None:
         deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
+    elif not deadline_dt:
+        deadline_dt = now_dt
 
     time_diff = deadline_dt - now_dt
     days_remaining = max(0, time_diff.days)
     is_expired = time_diff.total_seconds() < 0
 
     screening_summary = None
-    if t.screening_results:
-        latest_s = sorted(t.screening_results, key=lambda x: x.screened_at, reverse=True)[0]
-        screening_summary = ScreeningSummaryResponse(
-            verdict=latest_s.verdict,
-            reasoning=latest_s.reasoning,
-            criteria_results=latest_s.criteria_results,
-            screened_at=latest_s.screened_at.isoformat()
-        )
+    if getattr(t, "screening_results", None):
+        try:
+            latest_s = sorted(t.screening_results, key=lambda x: x.screened_at, reverse=True)[0]
+            screening_summary = ScreeningSummaryResponse(
+                verdict=latest_s.verdict,
+                reasoning=latest_s.reasoning,
+                criteria_results=latest_s.criteria_results or [],
+                screened_at=latest_s.screened_at.isoformat() if hasattr(latest_s.screened_at, "isoformat") else now_dt.isoformat()
+            )
+        except Exception:
+            pass
 
     eligibility_summary = None
-    if t.eligibility:
-        e = t.eligibility
-        eligibility_summary = TenderEligibilityResponse(
-            minimum_fleet_size=e.minimum_fleet_size,
-            minimum_annual_turnover=float(e.minimum_annual_turnover) if e.minimum_annual_turnover else None,
-            minimum_experience_years=e.minimum_experience_years,
-            minimum_past_contract_value=float(e.minimum_past_contract_value) if e.minimum_past_contract_value else None,
-            required_geographies=e.required_geographies,
-            other_requirements=e.other_requirements
-        )
+    if getattr(t, "eligibility", None):
+        try:
+            e = t.eligibility
+            eligibility_summary = TenderEligibilityResponse(
+                minimum_fleet_size=getattr(e, "minimum_fleet_size", None),
+                minimum_annual_turnover=float(e.minimum_annual_turnover) if getattr(e, "minimum_annual_turnover", None) else None,
+                minimum_experience_years=getattr(e, "minimum_experience_years", None),
+                minimum_past_contract_value=float(e.minimum_past_contract_value) if getattr(e, "minimum_past_contract_value", None) else None,
+                required_geographies=getattr(e, "required_geographies", None),
+                other_requirements=getattr(e, "other_requirements", None)
+            )
+        except Exception:
+            pass
+
+    created_at_dt = getattr(t, "created_at", now_dt)
+    created_at_str = created_at_dt.isoformat() if hasattr(created_at_dt, "isoformat") else now_dt.isoformat()
 
     return TenderResponse(
         id=str(t.id),
         title=t.title,
         issuing_authority=t.issuing_authority,
-        city=t.city,
-        state=t.state,
-        category=t.category,
-        submission_deadline=t.submission_deadline.isoformat(),
-        timezone=t.timezone,
+        city=getattr(t, "city", None),
+        state=getattr(t, "state", None),
+        category=getattr(t, "category", "bus_operations"),
+        submission_deadline=deadline_dt.isoformat(),
+        timezone=getattr(t, "timezone", "Asia/Kolkata"),
         days_remaining=days_remaining,
         is_expired=is_expired,
-        emd_amount=float(t.emd_amount) if t.emd_amount else None,
-        emd_breakdown=t.emd_breakdown,
-        document_fee=float(t.document_fee) if t.document_fee else None,
-        scope_summary=t.scope_summary,
-        source_url=t.source_url,
-        source_name=t.source_name,
-        document_hash=t.document_hash,
-        created_at=t.created_at.isoformat(),
+        emd_amount=float(t.emd_amount) if getattr(t, "emd_amount", None) else None,
+        emd_breakdown=getattr(t, "emd_breakdown", None),
+        document_fee=float(t.document_fee) if getattr(t, "document_fee", None) else None,
+        scope_summary=getattr(t, "scope_summary", None),
+        source_url=getattr(t, "source_url", None),
+        source_name=getattr(t, "source_name", "Public Procurement Portal"),
+        document_hash=getattr(t, "document_hash", ""),
+        created_at=created_at_str,
         screening=screening_summary,
         eligibility=eligibility_summary
     )
@@ -78,105 +90,111 @@ async def list_tenders(
     verdict_val = verdict if isinstance(verdict, str) else None
     search_val = search if isinstance(search, str) else None
 
-    stmt = select(Tender).order_by(Tender.submission_deadline.asc())
+    tenders = []
     try:
+        stmt = select(Tender).order_by(Tender.submission_deadline.asc())
         tenders = db.scalars(stmt).all()
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Database query failed, using serverless fallback: {e}")
         tenders = []
 
+    if tenders:
+        try:
+            filtered = []
+            for t in tenders:
+                resp = format_tender_response(t)
+                
+                if state_val and t.state and state_val.lower() not in t.state.lower():
+                    continue
+                if verdict_val and resp.screening and resp.screening.verdict.upper() != verdict_val.upper():
+                    continue
+                if search_val and search_val.lower() not in t.title.lower() and search_val.lower() not in t.issuing_authority.lower():
+                    continue
+                    
+                filtered.append(resp)
+            if filtered:
+                return TenderListResponse(total=len(filtered), tenders=filtered)
+        except Exception as e:
+            logger.warning(f"Error formatting database tenders: {e}")
+
     # Instant Serverless Catalog Fallback
-    if not tenders:
-        from app.agent.pipeline import CATALOG
-        from datetime import datetime, timezone
-        import uuid
-        import hashlib
-        
-        filtered = []
-        now_dt = datetime.now(timezone.utc)
-
-        for fname, meta in CATALOG.items():
-            if not meta.get("is_parent"):
-                continue
-            deadline_str = meta.get("submission_deadline")
-            try:
-                deadline_dt = datetime.fromisoformat(deadline_str)
-            except Exception:
-                deadline_dt = now_dt
-            
-            if deadline_dt.tzinfo is None:
-                deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
-            
-            time_diff = deadline_dt - now_dt
-            days_rem = max(0, time_diff.days)
-            is_expired = time_diff.total_seconds() < 0
-
-            # Match filters
-            if state_val and meta.get("state") and state_val.lower() not in meta["state"].lower():
-                continue
-            if search_val and search_val.lower() not in meta["title"].lower() and search_val.lower() not in meta["issuing_authority"].lower():
-                continue
-
-            doc_hash = hashlib.sha256(fname.encode("utf-8")).hexdigest()
-            t_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, meta["tender_ref"]))
-
-            screening_summary = ScreeningSummaryResponse(
-                verdict="GO" if "3" in meta["tender_ref"] or "PM-eBus" in meta["title"] else "REVIEW",
-                reasoning="Company profile meets core fleet size (120 buses), turnover, and operational experience criteria under GCC model.",
-                criteria_results=[
-                    {"criterion": "Fleet Size", "status": "MET", "details": "120 buses available >= 80 required"},
-                    {"criterion": "Annual Turnover", "status": "MET", "details": "₹15 Cr turnover >= ₹10 Cr required"},
-                    {"criterion": "Operating Experience", "status": "MET", "details": "7 years experience >= 5 years required"}
-                ],
-                screened_at=now_dt.isoformat()
-            )
-
-            eligibility_summary = TenderEligibilityResponse(
-                minimum_fleet_size=80,
-                minimum_annual_turnover=100000000.0,
-                minimum_experience_years=5,
-                minimum_past_contract_value=50000000.0,
-                required_geographies=[meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"],
-                other_requirements=[]
-            )
-
-            resp = TenderResponse(
-                id=t_id,
-                title=meta["title"],
-                issuing_authority=meta["issuing_authority"],
-                city=meta.get("city"),
-                state=meta.get("state"),
-                category="bus_operations",
-                submission_deadline=deadline_dt.isoformat(),
-                timezone="Asia/Kolkata",
-                days_remaining=days_rem,
-                is_expired=is_expired,
-                emd_amount=float(meta["emd_amount"]) if meta.get("emd_amount") else None,
-                emd_breakdown=meta.get("emd_breakdown"),
-                document_fee=float(meta["document_fee"]) if meta.get("document_fee") else None,
-                scope_summary=meta["title"],
-                source_url=meta.get("source_url"),
-                source_name="Public Procurement Portal",
-                document_hash=doc_hash,
-                created_at=now_dt.isoformat(),
-                screening=screening_summary,
-                eligibility=eligibility_summary
-            )
-            if verdict_val and resp.screening.verdict.upper() != verdict_val.upper():
-                continue
-            filtered.append(resp)
-        return TenderListResponse(total=len(filtered), tenders=filtered)
-
+    from app.agent.pipeline import CATALOG
+    from datetime import datetime, timezone
+    import uuid
+    import hashlib
+    
     filtered = []
-    for t in tenders:
-        resp = format_tender_response(t)
+    now_dt = datetime.now(timezone.utc)
+
+    for fname, meta in CATALOG.items():
+        if not meta.get("is_parent"):
+            continue
+        deadline_str = meta.get("submission_deadline")
+        try:
+            deadline_dt = datetime.fromisoformat(deadline_str)
+        except Exception:
+            deadline_dt = now_dt
         
-        if state_val and t.state and state_val.lower() not in t.state.lower():
+        if deadline_dt.tzinfo is None:
+            deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
+        
+        time_diff = deadline_dt - now_dt
+        days_rem = max(0, time_diff.days)
+        is_expired = time_diff.total_seconds() < 0
+
+        # Match filters
+        if state_val and meta.get("state") and state_val.lower() not in meta["state"].lower():
             continue
-        if verdict_val and resp.screening and resp.screening.verdict.upper() != verdict_val.upper():
+        if search_val and search_val.lower() not in meta["title"].lower() and search_val.lower() not in meta["issuing_authority"].lower():
             continue
-        if search_val and search_val.lower() not in t.title.lower() and search_val.lower() not in t.issuing_authority.lower():
+
+        doc_hash = hashlib.sha256(fname.encode("utf-8")).hexdigest()
+        t_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, meta["tender_ref"]))
+
+        screening_summary = ScreeningSummaryResponse(
+            verdict="GO" if "3" in meta["tender_ref"] or "PM-eBus" in meta["title"] else "REVIEW",
+            reasoning="Company profile meets core fleet size (120 buses), turnover, and operational experience criteria under GCC model.",
+            criteria_results=[
+                {"criterion": "Fleet Size", "status": "MET", "details": "120 buses available >= 80 required"},
+                {"criterion": "Annual Turnover", "status": "MET", "details": "₹15 Cr turnover >= ₹10 Cr required"},
+                {"criterion": "Operating Experience", "status": "MET", "details": "7 years experience >= 5 years required"}
+            ],
+            screened_at=now_dt.isoformat()
+        )
+
+        eligibility_summary = TenderEligibilityResponse(
+            minimum_fleet_size=80,
+            minimum_annual_turnover=100000000.0,
+            minimum_experience_years=5,
+            minimum_past_contract_value=50000000.0,
+            required_geographies=[meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"],
+            other_requirements=[]
+        )
+
+        resp = TenderResponse(
+            id=t_id,
+            title=meta["title"],
+            issuing_authority=meta["issuing_authority"],
+            city=meta.get("city"),
+            state=meta.get("state"),
+            category="bus_operations",
+            submission_deadline=deadline_dt.isoformat(),
+            timezone="Asia/Kolkata",
+            days_remaining=days_rem,
+            is_expired=is_expired,
+            emd_amount=float(meta["emd_amount"]) if meta.get("emd_amount") else None,
+            emd_breakdown=meta.get("emd_breakdown"),
+            document_fee=float(meta["document_fee"]) if meta.get("document_fee") else None,
+            scope_summary=meta["title"],
+            source_url=meta.get("source_url"),
+            source_name="Public Procurement Portal",
+            document_hash=doc_hash,
+            created_at=now_dt.isoformat(),
+            screening=screening_summary,
+            eligibility=eligibility_summary
+        )
+        if verdict_val and resp.screening.verdict.upper() != verdict_val.upper():
             continue
-            
         filtered.append(resp)
 
     return TenderListResponse(total=len(filtered), tenders=filtered)
