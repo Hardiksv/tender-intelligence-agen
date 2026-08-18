@@ -15,10 +15,10 @@ class Settings(BaseSettings):
     # LLM Settings (LiteLLM)
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "gemini/gemini-2.5-flash"
-    LLM_FALLBACK_MODEL: str = "gemini/gemini-2.5-pro"
+    LLM_FALLBACK_MODEL: str = "gemini/gemini-1.5-flash"
 
     # Embeddings Settings
-    EMBEDDING_MODEL: str = "gemini/text-embedding-004"
+    EMBEDDING_MODEL: str = "gemini/embedding-001"
     EMBEDDING_DIMENSION: int = 768
 
     # Application Settings
