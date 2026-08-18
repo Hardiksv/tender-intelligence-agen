@@ -78,8 +78,12 @@ app.include_router(profile.router)
 app.include_router(chat.router)
 app.include_router(ingestion.router)
 
-# Root-level Route Aliases for assignment compliance
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.openapi.utils import get_openapi
+
+# Root-level Route Aliases for assignment compliance and Vercel compatibility
 @app.get("/", tags=["Root"])
+@app.get("/api", tags=["Root"])
 async def root_index():
     """Root status endpoint."""
     return {
@@ -87,10 +91,12 @@ async def root_index():
         "app": "Tender Intelligence Agent API",
         "version": "1.0.0",
         "docs_url": "/docs",
+        "api_docs_url": "/api/docs",
         "health_url": "/health"
     }
 
 @app.get("/health", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
 async def health_check():
     """Basic health check endpoint."""
     return {
@@ -99,6 +105,17 @@ async def health_check():
         "version": "1.0.0",
         "timezone": settings.TIMEZONE
     }
+
+@app.get("/api/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    return get_swagger_ui_html(
+        openapi_url="/api/openapi.json" if app.openapi_url else "/openapi.json",
+        title=app.title + " - Swagger UI"
+    )
+
+@app.get("/api/openapi.json", include_in_schema=False)
+async def custom_openapi():
+    return JSONResponse(get_openapi(title=app.title, version=app.version, routes=app.routes))
 
 @app.get("/tenders", tags=["Tenders Alias"])
 async def list_tenders_alias(db = Depends(get_db)):
