@@ -131,8 +131,10 @@ def init_db_if_empty():
     except Exception as e:
         logger.warning(f"Failed to initialize database: {e}")
 
-# Run startup initialization
-init_db_if_empty()
+@app.on_event("startup")
+async def startup_event():
+    """Initializes database schema and default company profile on startup."""
+    init_db_if_empty()
 
 # CORS Configuration
 origins = [
