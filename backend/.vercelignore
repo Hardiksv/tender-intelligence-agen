@@ -1,0 +1,10 @@
+.pytest_cache/
+__pycache__/
+*.pyc
+tests/
+*.db
+tender_intelligence.db
+.git/
+.venv/
+env/
+venv/
