@@ -57,16 +57,19 @@ class LiteLLMClient(AbstractLLMClient):
         messages.append({"role": "user", "content": prompt})
 
         if settings.LLM_API_KEY:
-            os.environ["GEMINI_API_KEY"] = settings.LLM_API_KEY
-            os.environ["GOOGLE_API_KEY"] = settings.LLM_API_KEY
+            if settings.LLM_API_KEY.startswith("gsk_") or "groq" in self.primary_model:
+                os.environ["GROQ_API_KEY"] = settings.LLM_API_KEY
+            else:
+                os.environ["GEMINI_API_KEY"] = settings.LLM_API_KEY
+                os.environ["GOOGLE_API_KEY"] = settings.LLM_API_KEY
 
         # Try models in priority order
         models_to_try = [
-            "gemini/gemini-3.6-flash",
-            "gemini/gemini-3.1-pro-preview",
             self.primary_model,
             self.fallback_model,
-            "gemini/gemini-2.5-flash"
+            "groq/openai/gpt-oss-120b",
+            "groq/qwen/qwen3.6-27b",
+            "groq/openai/gpt-oss-20b"
         ]
         # Remove duplicates preserving order
         models_to_try = list(dict.fromkeys(models_to_try))
@@ -82,6 +85,8 @@ class LiteLLMClient(AbstractLLMClient):
                     api_key=self.api_key if (self.api_key and self.api_key != "mock_key_for_testing") else None
                 )
                 content = response.choices[0].message.content
+                if "</think>" in content:
+                    content = content.split("</think>")[-1].strip()
                 usage = self._extract_usage(response, model, "completion")
 
                 return {
@@ -116,10 +121,15 @@ class LiteLLMClient(AbstractLLMClient):
         messages.append({"role": "user", "content": prompt + instructions})
 
         if settings.LLM_API_KEY:
-            os.environ["GEMINI_API_KEY"] = settings.LLM_API_KEY
-            os.environ["GOOGLE_API_KEY"] = settings.LLM_API_KEY
+            if settings.LLM_API_KEY.startswith("gsk_") or "groq" in self.primary_model:
+                os.environ["GROQ_API_KEY"] = settings.LLM_API_KEY
+            else:
+                os.environ["GEMINI_API_KEY"] = settings.LLM_API_KEY
+                os.environ["GOOGLE_API_KEY"] = settings.LLM_API_KEY
 
-        models_to_try = [self.primary_model, self.fallback_model]
+        models_to_try = [self.primary_model, self.fallback_model, "groq/openai/gpt-oss-120b", "groq/qwen/qwen3.6-27b"]
+        # Remove duplicates preserving order
+        models_to_try = list(dict.fromkeys(models_to_try))
         last_error = None
 
         for model in models_to_try:
@@ -132,6 +142,8 @@ class LiteLLMClient(AbstractLLMClient):
                     api_key=self.api_key if self.api_key != "mock_key_for_testing" else None
                 )
                 raw_text = response.choices[0].message.content
+                if "</think>" in raw_text:
+                    raw_text = raw_text.split("</think>")[-1].strip()
                 parsed_json = json.loads(raw_text)
                 validated_obj = response_model.model_validate(parsed_json)
                 usage = self._extract_usage(response, model, "structured_extraction")

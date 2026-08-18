@@ -28,7 +28,8 @@ def test_embedding_dimension_mismatch_fails_fast(monkeypatch):
     """
     TEST: Intentional dimension mismatch MUST fail fast.
     """
-    # Mock fallback or vector generator to return invalid dimension (e.g. 50 dimensions)
+    # Mock all cloud and local embedding APIs to trigger dimension mismatch
+    monkeypatch.setattr("app.services.embeddings._call_jina_api", lambda texts, **kwargs: [[0.1] * 50] * len(texts))
     monkeypatch.setattr("app.services.embeddings._generate_fallback_vector", lambda text, dim: [0.1] * 50)
     monkeypatch.setattr("app.services.embeddings.litellm.embedding", MagicMock(side_effect=RuntimeError("Mock API error")))
     monkeypatch.setattr("app.services.embeddings._get_sentence_transformer", MagicMock(side_effect=RuntimeError("Mock ST error")))

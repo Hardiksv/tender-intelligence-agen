@@ -1,3 +1,5 @@
+import json
+import urllib.request
 from typing import List
 import hashlib
 import litellm
@@ -15,7 +17,7 @@ def _get_sentence_transformer():
         from sentence_transformers import SentenceTransformer
         fallback_name = (
             settings.EMBEDDING_MODEL
-            if not settings.EMBEDDING_MODEL.startswith(("gemini", "groq", "text-embedding", "models/"))
+            if not settings.EMBEDDING_MODEL.startswith(("gemini", "groq", "jina", "text-embedding", "models/"))
             else "sentence-transformers/all-MiniLM-L6-v2"
         )
         logger.info(f"Initializing local embedding model: {fallback_name}")
@@ -31,9 +33,40 @@ def _generate_fallback_vector(text: str, dimension: int) -> List[float]:
     return (raw_vec * multiplier)[:dimension]
 
 
+def _call_jina_api(texts: List[str], task_type: str = "retrieval.query") -> List[List[float]]:
+    """Calls Jina AI Embeddings API (v3/v5) with 768 dimensions constraint."""
+    api_key = getattr(settings, "EMBEDDING_API_KEY", "") or settings.LLM_API_KEY
+    if not api_key or not api_key.startswith("jina_"):
+        return []
+
+    url = "https://api.jina.ai/v1/embeddings"
+    payload = {
+        "model": settings.EMBEDDING_MODEL if "jina" in settings.EMBEDDING_MODEL else "jina-embeddings-v5-omni-small",
+        "task": task_type,
+        "dimensions": settings.EMBEDDING_DIMENSION,
+        "normalized": True,
+        "input": texts
+    }
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": "Mozilla/5.0"
+        }
+    )
+
+    with urllib.request.urlopen(req, timeout=15.0) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        embeddings = [item["embedding"] for item in data.get("data", [])]
+        return embeddings
+
+
 def generate_embedding(text: str) -> List[float]:
     """
-    Generates embedding vector for input text supporting Gemini (gemini-embedding-001),
+    Generates embedding vector for input text supporting Jina AI, Gemini,
     Groq, and local SentenceTransformer models with dimension validation.
     Explicitly requests output_dimensionality matching settings.EMBEDDING_DIMENSION (768).
     """
@@ -43,8 +76,17 @@ def generate_embedding(text: str) -> List[float]:
     vector = None
     model_name = settings.EMBEDDING_MODEL
 
-    # 1. Primary Cloud Embedding Provider (Gemini / Groq via LiteLLM)
-    if model_name.startswith(("gemini", "groq", "text-embedding", "models/")):
+    # 1. Primary Jina AI Embeddings Provider
+    if "jina" in model_name or (hasattr(settings, "EMBEDDING_API_KEY") and settings.EMBEDDING_API_KEY.startswith("jina_")):
+        try:
+            results = _call_jina_api([text], task_type="retrieval.query")
+            if results:
+                vector = results[0]
+        except Exception as e:
+            logger.warning(f"Jina AI embedding API call failed: {e}. Trying secondary provider.")
+
+    # 2. Secondary Cloud Embedding Provider (Gemini / Groq via LiteLLM)
+    if vector is None and model_name.startswith(("gemini", "groq", "text-embedding", "models/")):
         try:
             response = litellm.embedding(
                 model=model_name,
@@ -62,7 +104,7 @@ def generate_embedding(text: str) -> List[float]:
         except Exception as e:
             logger.warning(f"Cloud embedding API call ({model_name}) failed: {e}. Falling back to local vector generation.")
 
-    # 2. Local SentenceTransformer / Deterministic Vector Fallback
+    # 3. Local SentenceTransformer / Deterministic Vector Fallback
     if vector is None:
         try:
             st_model = _get_sentence_transformer()
@@ -96,8 +138,16 @@ def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
     vectors = []
     model_name = settings.EMBEDDING_MODEL
 
-    # Attempt batch embedding via LiteLLM if supported
-    if model_name.startswith(("gemini", "groq", "text-embedding", "models/")):
+    # 1. Primary Jina AI Embeddings Batch Provider
+    if "jina" in model_name or (hasattr(settings, "EMBEDDING_API_KEY") and settings.EMBEDDING_API_KEY.startswith("jina_")):
+        try:
+            vectors = _call_jina_api(texts, task_type="retrieval.passage")
+        except Exception as e:
+            logger.warning(f"Batch Jina AI embedding failed: {e}. Trying secondary provider.")
+            vectors = []
+
+    # 2. Attempt batch embedding via LiteLLM if supported
+    if not vectors and model_name.startswith(("gemini", "groq", "text-embedding", "models/")):
         try:
             response = litellm.embedding(
                 model=model_name,
@@ -117,6 +167,7 @@ def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
             logger.warning(f"Batch cloud embedding failed: {e}. Falling back to local batch generation.")
             vectors = []
 
+    # 3. Local SentenceTransformer Fallback
     if not vectors:
         try:
             st_model = _get_sentence_transformer()

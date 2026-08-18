@@ -12,13 +12,14 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///tender_intelligence.db"
     TEST_DATABASE_URL: Optional[str] = None
 
-    # LLM Settings (LiteLLM)
+    # LLM Settings (Groq / LiteLLM)
     LLM_API_KEY: str = ""
-    LLM_MODEL: str = "gemini/gemini-3.6-flash"
-    LLM_FALLBACK_MODEL: str = "gemini/gemini-3.1-pro-preview"
+    LLM_MODEL: str = "groq/openai/gpt-oss-120b"
+    LLM_FALLBACK_MODEL: str = "groq/qwen/qwen3.6-27b"
 
-    # Embeddings Settings
-    EMBEDDING_MODEL: str = "gemini/gemini-embedding-001"
+    # Embeddings Settings (Jina AI / LiteLLM)
+    EMBEDDING_API_KEY: str = ""
+    EMBEDDING_MODEL: str = "jina-embeddings-v5-omni-small"
     EMBEDDING_DIMENSION: int = 768
 
     # Application Settings
