@@ -31,16 +31,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration
-origins = [
-    settings.FRONTEND_ORIGIN,
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000"
-] if settings.FRONTEND_ORIGIN else ["*"]
+# CORS Configuration - Fully allow all Vercel domains and origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if not settings.FRONTEND_ORIGIN else origins,
+    allow_origins=["*"],
+    allow_origin_regex=r".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
