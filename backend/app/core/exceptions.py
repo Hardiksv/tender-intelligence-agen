@@ -41,6 +41,14 @@ class EmbeddingDimensionMismatchException(TenderAgentException):
     pass
 
 
+class EmbeddingGenerationException(TenderAgentException):
+    """Raised when no embedding provider (Jina, cloud LiteLLM, local SentenceTransformer)
+    can produce a real vector for the given text. Deliberately NOT swallowed into a
+    fake/hash-based vector — a silent fake vector would poison cosine-similarity search
+    with meaningless "matches" and no error signal, which is worse than a loud failure."""
+    pass
+
+
 class RAGException(TenderAgentException):
     """Raised during RAG retrieval or context assembly."""
     pass

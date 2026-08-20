@@ -7,6 +7,25 @@ from app.core.exceptions import ParsingException, LanguageUnsupportedException
 from app.core.logging import logger, log_action
 from app.services.language import detect_document_language
 
+# Real PDF files always start with this magic header (spec: ISO 32000).
+# A scraper that saves a 404 page / WordPress homepage as "something.pdf" will
+# NOT have this header — pymupdf will still happily "open" that HTML and
+# extract garbage nav-menu text without ever raising an error, which is how
+# 4 broken files silently entered this project's seed set. Fail loud, here.
+_PDF_MAGIC = b"%PDF-"
+
+
+def _validate_is_real_pdf(file_path: str, file_bytes: bytes) -> None:
+    """Guards against non-PDF content (HTML error pages, etc.) saved with a .pdf extension."""
+    header = file_bytes[:1024].lstrip(b"\xef\xbb\xbf")  # tolerate BOM
+    if not header.startswith(_PDF_MAGIC):
+        snippet = file_bytes[:120].decode("utf-8", errors="replace").strip().replace("\n", " ")
+        raise ParsingException(
+            f"'{os.path.basename(file_path)}' does not have a valid PDF header (%PDF-). "
+            f"This usually means a scraper saved an HTML/error page with a .pdf extension. "
+            f"First bytes: {snippet!r}"
+        )
+
 
 def parse_pdf_document(file_path: str) -> Dict[str, Any]:
     """
@@ -21,6 +40,10 @@ def parse_pdf_document(file_path: str) -> Dict[str, Any]:
         with open(file_path, "rb") as f:
             file_bytes = f.read()
             doc_hash = hashlib.sha256(file_bytes).hexdigest()
+
+        # Reject non-PDF content BEFORE handing it to pymupdf, which will
+        # otherwise silently "parse" HTML/text as if it were real document content.
+        _validate_is_real_pdf(file_path, file_bytes)
 
         doc = pymupdf.open(file_path)
         page_count = len(doc)
@@ -68,6 +91,8 @@ def parse_pdf_document(file_path: str) -> Dict[str, Any]:
 
         return result
 
+    except ParsingException:
+        raise
     except Exception as e:
         logger.error(f"Error parsing PDF file {file_path}: {str(e)}")
         raise ParsingException(f"Failed to parse PDF document: {str(e)}")

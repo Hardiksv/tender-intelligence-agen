@@ -33,7 +33,25 @@ Gemini 2.5 Flash (Primary) / Gemini 2.5 Pro (Fallback)
 
 ## Seed Dataset & Document Integrity
 
-The system operates strictly over **100% authentic, publicly downloaded government procurement RFPs and amendments** from Convergence Energy Services Limited (CESL) and the Ministry of Housing and Urban Affairs (MoHUA), all freely accessible from the official PM-eBus Sewa portal (pm-ebus-sewa.mohua.gov.in) without registration.
+The system operates over publicly downloaded government procurement RFPs and amendments
+from Convergence Energy Services Limited (CESL) and the Ministry of Housing and Urban
+Affairs (MoHUA), freely accessible from the official PM-eBus Sewa portal
+(pm-ebus-sewa.mohua.gov.in) without registration.
+
+### Integrity verification
+
+Every file in `data/raw/` is validated as a genuine PDF before ingestion. `pdf_parser.py`
+checks for the `%PDF-` magic header before handing the file to PyMuPDF, and raises a
+`ParsingException` if it's missing — a file that merely has a `.pdf` extension is not
+proof it's a real PDF. This guardrail exists because an earlier scraping pass saved a
+handful of 404/homepage HTML responses with a `.pdf` extension; PyMuPDF will silently
+"open" HTML and extract nav-menu text as if it were real document content, with no error
+raised anywhere, so a magic-byte check at the ingestion boundary is required.
+
+`scripts/validate_seed_docs.py` runs this same check standalone over the whole `data/raw/`
+directory, and `tests/test_seed_data_integrity.py` covers it in the test suite — so a
+corrupted or wrong-linked seed file fails fast during development / CI instead of silently
+entering the corpus and being fed to the LLM as if it were real tender content.
 
 ### Verified Public Tender Documents in `data/raw/` (14 Files, 4 Distinct Programs)
 
@@ -71,7 +89,10 @@ The system operates strictly over **100% authentic, publicly downloaded governme
 |---|---|---|---|---|---|
 | 14 | `cesl_pm_edrive_6230_electric_buses_gcc.pdf` | Original RFP | 533 | 10.4 MB | 6,230 Electric Buses (2,900 STUs + 3,330 Delhi DTC) |
 
-> **Total Verified Corpus:** **14 distinct authentic PDF documents** across **4 separate central government GCC procurement programs**, all publicly downloadable from pm-ebus-sewa.mohua.gov.in and convergence.co.in. Zero synthetic files.
+> **Total Corpus:** 14 PDF documents across 4 central government GCC procurement programs,
+> sourced from pm-ebus-sewa.mohua.gov.in and convergence.co.in. Every file is verified by
+> `scripts/validate_seed_docs.py` to be a genuine PDF (not a scraper artifact such as an
+> HTML error/homepage saved with a `.pdf` extension) before ingestion.
 
 ---
 
@@ -105,7 +126,7 @@ Government RFPs distinguish between:
 
 ### 1. Agent Orchestration (Explicit Hand-Rolled Loop)
 Implemented as an explicit multi-stage pipeline in `app/agent/pipeline.py`:
-1. `PARSE`: Multi-page text extraction with PyMuPDF and English language guardrail check.
+1. `PARSE`: Multi-page text extraction with PyMuPDF, magic-byte PDF validation, and English language guardrail check.
 2. `HASH_CHECK`: SHA-256 fingerprint verification ensuring idempotent ingestion.
 3. `RESOLVE_PARENT`: Creates or retrieves parent `Tender` record and manages amendment hierarchy.
 4. `EXTRACT`: Structured schema extraction via LiteLLM (`TenderExtractionSchema`).
@@ -128,7 +149,8 @@ Implemented as an explicit multi-stage pipeline in `app/agent/pipeline.py`:
 ### 3. Grounded RAG with Provenance Citations
 - **Strict Anti-Hallucination Guardrail**: When retrieved context lacks sufficient evidence, the agent strictly responds:
   *"I could not find sufficient evidence in the stored tender documents to answer this confidently."*
-- **No Canned Synthetics**: Zero hardcoded keyword fallback answers. If the LLM provider is unavailable, a clean service error is returned.
+- **No Canned Synthetics**: `retrieve_relevant_context()` (`app/services/retrieval.py`) only ever returns chunks that came from real SQL rows or real vector similarity search. If nothing is found — including on a fresh deployment with an empty vector store — it returns an empty list, which `rag.py` turns into the honest "insufficient evidence" message above rather than fabricating an answer from any hardcoded source.
+- **No Fabricated Embeddings**: `generate_embedding()` (`app/services/embeddings.py`) tries Jina AI → cloud LiteLLM (Gemini/Groq) → local SentenceTransformer, in order. If every real provider fails, it raises `EmbeddingGenerationException` instead of returning a hash-derived placeholder vector, since a semantically meaningless vector would otherwise produce plausible-looking but meaningless similarity scores with no visible error.
 - **Page-Level Grounding**: Every answer is backed by verifiable citations containing document name, page number, and text snippet.
 
 ### 4. Database & Vector Storage

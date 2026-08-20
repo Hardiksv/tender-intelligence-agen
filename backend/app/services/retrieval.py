@@ -6,14 +6,14 @@ from sqlalchemy import select
 
 from app.db.models import Tender, DocumentChunk, Document
 from app.services.embeddings import generate_embedding
-from app.core.logging import log_action
+from app.core.logging import logger, log_action
 
 
 def route_query_type(question: str) -> str:
     """Simple query router detecting SQL vs Vector intent."""
     q_lower = question.lower()
     date_keywords = ["close", "closing", "deadline", "next 15 days", "days remaining", "expire", "due date"]
-    
+
     if any(k in q_lower for k in date_keywords):
         return "STRUCTURED_SQL"
     return "VECTOR_SEARCH"
@@ -27,6 +27,13 @@ def retrieve_relevant_context(
 ) -> List[Dict[str, Any]]:
     """
     Hybrid retriever combining SQL date queries and pgvector cosine similarity search.
+
+    Returns an EMPTY list if no genuine grounded evidence was found (no query vector,
+    no DB rows, or the search errored) — it deliberately does NOT fall back to
+    fabricating chunks from a hardcoded catalog. The caller (rag.py) already handles
+    an empty result by returning the honest "I could not find sufficient evidence..."
+    message, so an empty list here is the correct, truthful signal, not a gap to
+    paper over.
     """
     query_type = route_query_type(question)
     retrieved_context: List[Dict[str, Any]] = []
@@ -35,11 +42,11 @@ def retrieve_relevant_context(
         # Deadline query logic: tenders closing in next 15 days
         now_dt = datetime.now(timezone.utc)
         future_dt = now_dt + timedelta(days=30)
-        
+
         stmt = select(Tender).where(Tender.submission_deadline >= now_dt)
         if tender_id_filter:
             stmt = stmt.where(Tender.id == tender_id_filter)
-        
+
         tenders = db.scalars(stmt.limit(top_k)).all()
         for t in tenders:
             dl = t.submission_deadline
@@ -62,7 +69,7 @@ def retrieve_relevant_context(
         try:
             query_vector = generate_embedding(question)
         except Exception as e:
-            logger.warning(f"Query vector generation failed: {e}. Falling back to catalog semantic match.")
+            logger.warning(f"Query vector generation failed: {e}. No vector search will run for this query.")
 
         if query_vector:
             try:
@@ -128,7 +135,7 @@ def retrieve_relevant_context(
                             else:
                                 sim = 0.5
                             scored_rows.append((sim, chunk, title, file_name))
-                    
+
                     scored_rows.sort(key=lambda x: x[0], reverse=True)
                     for sim, chunk, title, file_name in scored_rows[:top_k]:
                         retrieved_context.append({
@@ -143,50 +150,19 @@ def retrieve_relevant_context(
             except Exception as e:
                 logger.warning(f"Vector search query failed: {e}")
 
-    # Serverless Catalog Fallback when vector DB has 0 seeded chunks
-    if not retrieved_context:
-        from app.agent.pipeline import CATALOG
-        import uuid
-        q_words = set(question.lower().split())
-        
-        for fname, meta in CATALOG.items():
-            if not meta.get("is_parent"):
-                continue
-            t_title = meta["title"]
-            t_ref = meta["tender_ref"]
-            t_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, t_ref))
-            if tender_id_filter and str(tender_id_filter) not in [t_id, t_ref]:
-                continue
-            
-            # Formulate grounded factual chunk
-            emd_str = f"Total EMD: INR {meta.get('emd_amount'):,.2f}." if meta.get('emd_amount') else ""
-            if meta.get("emd_breakdown"):
-                emd_str += f" Lot Breakdown: {meta['emd_breakdown']}."
-            
-            chunk_text = (
-                f"Tender Reference: {t_ref}. Title: {t_title}. "
-                f"Issuing Authority: {meta.get('issuing_authority')}. State: {meta.get('state')}. "
-                f"Bus Quantity: {meta.get('latest_bus_quantity')} electric buses (Source: {meta.get('latest_quantity_source')}). "
-                f"Submission Deadline: {meta.get('submission_deadline')}. {emd_str} "
-                f"Technical Eligibility: Minimum 80 buses operational experience, ₹10 Cr annual turnover, 5+ years experience required."
-            )
-            
-            # Simple keyword overlap scoring
-            words_in_chunk = set(chunk_text.lower().split())
-            overlap = len(q_words.intersection(words_in_chunk))
-            sim_score = round(min(0.95, max(0.65, overlap / max(len(q_words), 1))), 4)
-            
-            retrieved_context.append({
-                "tender_id": t_id,
-                "tender_title": t_title,
-                "document_name": fname,
-                "page_number": 1,
-                "chunk_index": 0,
-                "text": chunk_text,
-                "similarity_score": sim_score
-            })
-            if len(retrieved_context) >= top_k:
-                break
+    # NOTE: There used to be a "Serverless Catalog Fallback" here that, when 0 chunks
+    # were found (e.g. on a fresh/ephemeral deployment with no seeded vector store),
+    # pulled facts from the hardcoded CATALOG dict in app/agent/pipeline.py, labeled
+    # them as retrieved chunks, and assigned them a fabricated keyword-overlap
+    # "similarity_score". That is exactly the kind of unsourced, non-grounded answer
+    # this assignment explicitly forbids ("Answers must be grounded in the stored
+    # documents, with citations. No unsourced claims."), and it silently disguised a
+    # missing/empty vector store as if retrieval had actually succeeded.
+    #
+    # If retrieved_context is empty here, that's the truth: either the DB has no
+    # embedded chunks yet, or nothing matched. rag.py already turns an empty list
+    # into "I could not find sufficient evidence in the stored tender documents to
+    # answer this confidently." — which is the correct, honest behavior.
 
     log_action(
         "RAG_RETRIEVAL_COMPLETED",
