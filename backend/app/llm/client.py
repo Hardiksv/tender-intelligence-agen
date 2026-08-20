@@ -5,7 +5,7 @@ from pydantic import BaseModel
 import litellm
 
 from app.core.config import settings
-from app.core.logging import logger, log_action
+from app.core.logging import logger
 from app.llm.base import AbstractLLMClient
 
 T = TypeVar("T", bound=BaseModel)
@@ -121,7 +121,7 @@ class LiteLLMClient(AbstractLLMClient):
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        
+
         instructions = f"\n\nRespond ONLY with a valid JSON object strictly matching this schema:\n{json.dumps(response_model.model_json_schema())}"
         messages.append({"role": "user", "content": prompt + instructions})
 

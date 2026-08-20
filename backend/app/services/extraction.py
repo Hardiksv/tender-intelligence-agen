@@ -1,11 +1,10 @@
 import os
 from typing import Dict, Any
 
-from app.core.config import settings
 from app.core.logging import logger, log_action
 from app.llm.client import llm_client
 from app.schemas.extraction import TenderExtractionSchema, OtherRequirementItem
-from app.services.normalization import normalize_currency_to_inr, normalize_fleet_size
+from app.services.normalization import normalize_currency_to_inr
 
 PROMPT_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -73,7 +72,7 @@ def extract_tender_structured_data(full_text: str, document_name: str = "") -> D
 def heuristic_fallback_extraction(full_text: str, document_name: str) -> Dict[str, Any]:
     """Fallback heuristic extractor extracting document-specific fields via regex."""
     import re
-    
+
     # 1. Title & Authority
     title = f"Bus Operations Tender ({document_name})"
     title_match = re.search(r'(Procurement|Selection|Contract|Operation)[^\n]+', full_text, re.IGNORECASE)

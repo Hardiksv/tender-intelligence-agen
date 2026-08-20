@@ -3,7 +3,7 @@ import os
 import pymupdf  # PyMuPDF
 from typing import Dict, Any, List
 
-from app.core.exceptions import ParsingException, LanguageUnsupportedException
+from app.core.exceptions import ParsingException
 from app.core.logging import logger, log_action
 from app.services.language import detect_document_language
 

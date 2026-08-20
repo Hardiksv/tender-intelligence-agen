@@ -49,7 +49,7 @@ def normalize_fleet_size(raw_value: Any) -> Optional[int]:
         return None
     if isinstance(raw_value, (int, float)):
         return int(raw_value)
-    
+
     cleaned = str(raw_value).replace(",", "")
     match = re.search(r'(\d+)', cleaned)
     if match:

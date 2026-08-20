@@ -21,7 +21,7 @@ def get_engine():
             return test_engine
     except Exception as e:
         logger.warning(f"PostgreSQL connection offline ({e}). Initializing high-performance local SQLite store.")
-    
+
     # Fallback to local SQLite database (uses /tmp on Vercel serverless)
     if os.environ.get("VERCEL"):
         import shutil
@@ -52,4 +52,3 @@ def get_db() -> Generator:
         yield db
     finally:
         db.close()
-

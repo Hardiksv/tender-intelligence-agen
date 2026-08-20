@@ -1,6 +1,5 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, Depends, BackgroundTasks, status
 from sqlalchemy.orm import Session
-from typing import Optional
 
 from app.db.database import get_db, Base
 from app.db.models import IngestionJob, IngestionStatusEnum

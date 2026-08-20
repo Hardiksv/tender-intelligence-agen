@@ -1,7 +1,6 @@
 from langdetect import detect, DetectorFactory
 from typing import Tuple
 from app.core.logging import logger, log_action
-from app.core.exceptions import LanguageUnsupportedException
 
 # Set seed for deterministic language detection
 DetectorFactory.seed = 0
@@ -19,7 +18,7 @@ def detect_document_language(full_text: str) -> Tuple[bool, str]:
     try:
         detected_lang = detect(full_text)
         is_english = detected_lang.lower() == "en"
-        
+
         if not is_english:
             log_action(
                 "LANGUAGE_UNSUPPORTED",

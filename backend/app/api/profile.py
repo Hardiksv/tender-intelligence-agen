@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
@@ -68,7 +68,7 @@ async def update_company_profile(update_data: CompanyProfileUpdate, db: Session 
     for t in tenders:
         if not t.eligibility:
             continue
-        
+
         other_items = [
             OtherRequirementItem(
                 requirement_text=req.get("requirement_text", ""),

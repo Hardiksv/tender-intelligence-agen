@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Dict, Any, List
+from typing import List
 
 from app.schemas.profile import CompanyProfileBase
 from app.schemas.extraction import TenderEligibilitySchema
@@ -28,7 +28,7 @@ def screen_tender_eligibility(
         else:
             v = CriterionVerdict.FAIL
             reason = f"Company fleet size ({profile.fleet_size}) is below required minimum ({eligibility.minimum_fleet_size})."
-        
+
         criteria.append(CriterionDetail(
             criterion_name="Minimum Fleet Size",
             is_mandatory=True,
@@ -46,7 +46,7 @@ def screen_tender_eligibility(
         else:
             v = CriterionVerdict.FAIL
             reason = f"Company turnover (₹{profile.annual_turnover/1e7:.2f} Cr) is below required minimum (₹{eligibility.minimum_annual_turnover/1e7:.2f} Cr)."
-        
+
         criteria.append(CriterionDetail(
             criterion_name="Minimum Annual Turnover",
             is_mandatory=True,
@@ -64,7 +64,7 @@ def screen_tender_eligibility(
         else:
             v = CriterionVerdict.FAIL
             reason = f"Company experience ({profile.years_experience} years) is below required minimum ({eligibility.minimum_experience_years} years)."
-        
+
         criteria.append(CriterionDetail(
             criterion_name="Years of Experience",
             is_mandatory=True,
@@ -83,7 +83,7 @@ def screen_tender_eligibility(
         else:
             v = CriterionVerdict.FAIL
             reason = f"Largest executed contract (₹{max_company_contract/1e7:.2f} Cr) is below required minimum (₹{eligibility.minimum_past_contract_value/1e7:.2f} Cr)."
-        
+
         criteria.append(CriterionDetail(
             criterion_name="Minimum Past Contract Value",
             is_mandatory=True,
@@ -101,7 +101,7 @@ def screen_tender_eligibility(
         else:
             v = CriterionVerdict.REVIEW
             reason = f"Tender state '{tender_state}' is not in preferred geographies ({profile.preferred_geographies}). Requires strategic review."
-        
+
         criteria.append(CriterionDetail(
             criterion_name="Preferred Geography",
             is_mandatory=False,

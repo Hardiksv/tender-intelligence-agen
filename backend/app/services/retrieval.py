@@ -250,7 +250,7 @@ def retrieve_relevant_context(
     # embedded chunks yet, or nothing matched. rag.py already turns an empty list
     # into "I could not find sufficient evidence in the stored tender documents to
     # answer this confidently." — which is the correct, honest behavior.
-   
+
     # ------------------------------------------------------------------
     # Evidence-aware ranking for tender-fact questions
     #

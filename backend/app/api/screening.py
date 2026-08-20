@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from app.db.database import get_db
 from app.db.models import Tender, ScreeningResult
-from app.schemas.screening import ScreeningResultSchema, FinalVerdict, CriterionVerdict
+from app.schemas.screening import ScreeningResultSchema, FinalVerdict
 from app.schemas.profile import CompanyProfileBase
 from app.schemas.extraction import TenderEligibilitySchema, OtherRequirementItem
 from app.services.screening import screen_tender_eligibility

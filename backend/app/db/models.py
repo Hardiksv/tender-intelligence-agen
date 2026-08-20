@@ -5,7 +5,7 @@ from sqlalchemy import (
     Column, String, Text, Integer, Numeric, DateTime, Enum as SQLEnum, ForeignKey, JSON
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.types import TypeDecorator, CHAR, TypeEngine
+from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB as PG_JSONB
 
 class GUID(TypeDecorator):
@@ -86,7 +86,7 @@ class Tender(Base):
     city = Column(String(100), nullable=True)
     state = Column(String(100), nullable=True)
     category = Column(String(100), default="bus_operations", nullable=False)
-    
+
     # Bus Quantity Resolution (Original vs Latest Amended)
     original_bus_quantity = Column(Integer, nullable=True)
     latest_bus_quantity = Column(Integer, nullable=True)
@@ -115,7 +115,7 @@ class Tender(Base):
     source_name = Column(String(200), nullable=True)
     raw_document_path = Column(String(1000), nullable=False)
     document_hash = Column(String(64), unique=True, nullable=False, index=True)
-    
+
     # Provenance tracking for every extracted field
     extraction_provenance = Column(JSONType, nullable=True)
 

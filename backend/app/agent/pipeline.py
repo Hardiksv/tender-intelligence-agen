@@ -1,10 +1,8 @@
 import os
-import json
 import glob
 from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 
 from app.core.logging import logger, log_action
 from app.db.database import SessionLocal
@@ -18,7 +16,6 @@ from app.services.screening import screen_tender_eligibility
 from app.services.chunking import chunk_document_pages
 from app.services.embeddings import generate_embeddings_batch
 from app.schemas.profile import CompanyProfileBase
-from app.schemas.extraction import TenderEligibilitySchema, OtherRequirementItem
 
 SEED_DATA_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "raw")

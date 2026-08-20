@@ -5,7 +5,7 @@ from typing import Optional, List
 from datetime import datetime, timezone
 
 from app.db.database import get_db
-from app.db.models import Tender, ScreeningResult, TenderEligibility
+from app.db.models import Tender, TenderEligibility
 from app.schemas.tender import TenderResponse, TenderListResponse, ScreeningSummaryResponse, TenderEligibilityResponse
 from app.core.logging import logger
 from zoneinfo import ZoneInfo
@@ -139,14 +139,14 @@ async def list_tenders(
             filtered = []
             for t in tenders:
                 resp = format_tender_response(t)
-                
+
                 if state_val and t.state and state_val.lower() not in t.state.lower():
                     continue
                 if verdict_val and resp.screening and resp.screening.verdict.upper() != verdict_val.upper():
                     continue
                 if search_val and search_val.lower() not in t.title.lower() and search_val.lower() not in t.issuing_authority.lower():
                     continue
-                    
+
                 filtered.append(resp)
             if filtered:
                 return TenderListResponse(total=len(filtered), tenders=filtered)
@@ -158,7 +158,7 @@ async def list_tenders(
     from datetime import datetime, timezone
     import uuid
     import hashlib
-    
+
     filtered = []
     now_dt = datetime.now(timezone.utc)
 
@@ -170,10 +170,10 @@ async def list_tenders(
             deadline_dt = datetime.fromisoformat(deadline_str)
         except Exception:
             deadline_dt = now_dt
-        
+
         if deadline_dt.tzinfo is None:
             deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
-        
+
         time_diff = deadline_dt - now_dt
         days_rem = max(0, time_diff.days)
         is_expired = time_diff.total_seconds() < 0
@@ -245,7 +245,7 @@ async def get_daily_digest(db: Session = Depends(get_db)):
     review_tenders = [t for t in formatted if t.screening and t.screening.verdict == "REVIEW"]
 
     total_buses = sum((t.latest_bus_quantity or t.original_bus_quantity or 0) for t in tenders)
-    
+
     digest_text = f"# Tender Intelligence Daily Digest ({datetime.now(timezone.utc).strftime('%d %b %Y')})\n\n"
     digest_text += f"**Active Tenders Tracked:** {len(tenders)} opportunities | **Total Scope:** {total_buses:,} buses\n"
     digest_text += f"**Priority Actions:** {len(go_tenders)} GO | {len(review_tenders)} REVIEW\n\n"

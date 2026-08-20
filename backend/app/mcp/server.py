@@ -14,10 +14,9 @@ if backend_root not in sys.path:
     sys.path.insert(0, backend_root)
 
 from mcp.server.mcpserver import MCPServer
-import mcp.types as types
 
 from app.db.database import SessionLocal
-from app.db.models import Tender, ScreeningResult
+from app.db.models import Tender
 from app.schemas.chat import ChatRequest
 from app.services.rag import answer_tender_question
 from app.core.logging import log_action
