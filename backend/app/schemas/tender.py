@@ -26,15 +26,24 @@ class ScreeningSummaryResponse(BaseModel):
 class TenderResponse(BaseModel):
     id: str
     title: str
+    original_bus_quantity: Optional[int] = None
+    latest_bus_quantity: Optional[int] = None
+    latest_quantity_source: Optional[str] = None
     issuing_authority: str
     city: Optional[str] = None
     state: Optional[str] = None
     category: str
     submission_deadline: str
+    original_deadline: Optional[str] = None
+    latest_deadline: Optional[str] = None
+    latest_deadline_source: Optional[str] = None
     timezone: str
     days_remaining: int
     is_expired: bool
     emd_amount: Optional[float] = None
+    original_emd_amount: Optional[float] = None
+    latest_emd_amount: Optional[float] = None
+    latest_emd_source: Optional[str] = None
     emd_breakdown: Optional[Dict[str, float]] = None
     document_fee: Optional[float] = None
     scope_summary: Optional[str] = None

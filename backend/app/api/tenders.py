@@ -8,6 +8,7 @@ from app.db.database import get_db
 from app.db.models import Tender, ScreeningResult, TenderEligibility
 from app.schemas.tender import TenderResponse, TenderListResponse, ScreeningSummaryResponse, TenderEligibilityResponse
 from app.core.logging import logger
+from zoneinfo import ZoneInfo
 
 router = APIRouter(prefix="/api/tenders", tags=["Tenders"])
 
@@ -16,7 +17,9 @@ def format_tender_response(t: Tender) -> TenderResponse:
     now_dt = datetime.now(timezone.utc)
     deadline_dt = getattr(t, "submission_deadline", now_dt)
     if deadline_dt and hasattr(deadline_dt, "tzinfo") and deadline_dt.tzinfo is None:
-        deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
+        deadline_dt = deadline_dt.replace(
+            tzinfo=ZoneInfo(getattr(t, "timezone", "Asia/Kolkata"))
+        )
     elif not deadline_dt:
         deadline_dt = now_dt
 
@@ -58,15 +61,48 @@ def format_tender_response(t: Tender) -> TenderResponse:
     return TenderResponse(
         id=str(t.id),
         title=t.title,
+        original_bus_quantity=getattr(t, "original_bus_quantity", None),
+        latest_bus_quantity=getattr(t, "latest_bus_quantity", None),
+        latest_quantity_source=getattr(t, "latest_quantity_source", None),
         issuing_authority=t.issuing_authority,
         city=getattr(t, "city", None),
         state=getattr(t, "state", None),
         category=getattr(t, "category", "bus_operations"),
         submission_deadline=deadline_dt.isoformat(),
+        original_deadline=(
+    t.original_deadline.replace(
+        tzinfo=ZoneInfo(getattr(t, "timezone", "Asia/Kolkata"))
+    ).isoformat()
+    if getattr(t, "original_deadline", None) and t.original_deadline.tzinfo is None
+    else t.original_deadline.isoformat()
+    if getattr(t, "original_deadline", None)
+    else None
+),
+       latest_deadline=(
+    t.latest_deadline.replace(
+        tzinfo=ZoneInfo(getattr(t, "timezone", "Asia/Kolkata"))
+    ).isoformat()
+    if getattr(t, "latest_deadline", None) and t.latest_deadline.tzinfo is None
+    else t.latest_deadline.isoformat()
+    if getattr(t, "latest_deadline", None)
+    else None
+),
+        latest_deadline_source=getattr(t, "latest_deadline_source", None),
         timezone=getattr(t, "timezone", "Asia/Kolkata"),
         days_remaining=days_remaining,
         is_expired=is_expired,
         emd_amount=float(t.emd_amount) if getattr(t, "emd_amount", None) else None,
+        original_emd_amount=(
+            float(t.original_emd_amount)
+            if getattr(t, "original_emd_amount", None) is not None
+            else None
+        ),
+        latest_emd_amount=(
+            float(t.latest_emd_amount)
+            if getattr(t, "latest_emd_amount", None) is not None
+            else None
+        ),
+        latest_emd_source=getattr(t, "latest_emd_source", None),
         emd_breakdown=getattr(t, "emd_breakdown", None),
         document_fee=float(t.document_fee) if getattr(t, "document_fee", None) else None,
         scope_summary=getattr(t, "scope_summary", None),

@@ -1,6 +1,5 @@
 from typing import List, Dict, Any, Optional
 import os
-import re
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -67,9 +66,7 @@ def retrieve_relevant_context(
                     "4588",
                 ])
 
-            if "amendment" in q_lower or "amended" in q_lower:
-                # Retrieve amendment evidence only when the user is
-                # explicitly asking about amendments.
+            if "amendment" in q_lower or "amended" in q_lower or "latest" in q_lower:
                 exact_terms.extend([
                     "Amendment No. 11",
                     "Amendment No. 12",
@@ -87,7 +84,7 @@ def retrieve_relevant_context(
                     .where(DocumentChunk.chunk_text.ilike(f"%{term}%"))
                 )
 
-                rows = db.execute(stmt.limit(max(top_k, 20))).all()
+                rows = db.execute(stmt.limit(5)).all()
                 lexical_rows.extend(rows)
 
             seen = set()
@@ -250,180 +247,6 @@ def retrieve_relevant_context(
     # embedded chunks yet, or nothing matched. rag.py already turns an empty list
     # into "I could not find sufficient evidence in the stored tender documents to
     # answer this confidently." — which is the correct, honest behavior.
-   
-    # ------------------------------------------------------------------
-    # Evidence-aware ranking for tender-fact questions
-    #
-    # IMPORTANT:
-    # A later amendment number does NOT automatically mean that
-    # the amendment changed the requested fact.
-    # ------------------------------------------------------------------
-    def default_rank(item: Dict[str, Any]) -> float:
-        return float(item.get("similarity_score", 0.0))
-
-    def evidence_rank(item: Dict[str, Any]) -> float:
-        text = item.get("text", "")
-        document_name = item.get("document_name", "")
-        score = float(item.get("similarity_score", 0.0))
-        normalized = re.sub(r"\s+", " ", text).strip()
-
-        has_4588 = bool(re.search(r"\b4,588\b|\b4588\b", normalized))
-        has_3132 = bool(re.search(r"\b3,132\b|\b3132\b", normalized))
-        if has_4588:
-            score += 5.0
-
-        explicit_quantity_change = bool(
-            re.search(
-                r"((bus|buses|bus\s+quantity|number\s+of\s+buses).{0,120}(amended|revised|changed|increased|decreased|modified))"
-                r"|((amended|revised|changed|increased|decreased|modified).{0,120}(bus|buses|bus\s+quantity|number\s+of\s+buses))"
-                r"|(from\s+(?:4,588|4588|3,132|3132).{0,80}to\s+(?:4,588|4588|3,132|3132))",
-                normalized,
-                flags=re.IGNORECASE
-            )
-        )
-        if explicit_quantity_change:
-            score += 20.0
-
-        explicit_from_to = bool(
-            re.search(
-                r"(?:from\s+)?(4,588|4588|3,132|3132)\s*(?:buses?)?\s+(?:to|changed\s+to|revised\s+to|amended\s+to)\s+(4,588|4588|3,132|3132)",
-                normalized,
-                flags=re.IGNORECASE
-            )
-        )
-        if explicit_from_to:
-            score += 25.0
-
-        amendment_match = re.search(r"Amendment\s+No\.?\s*(\d+)", f"{document_name} {normalized}", flags=re.IGNORECASE)
-        is_amendment = amendment_match is not None
-        if is_amendment and not explicit_quantity_change:
-            score -= 4.0
-
-        if "gcc" in document_name.lower() and has_4588:
-            score += 5.0
-
-        subject_only_quantity = bool(
-            re.search(r"subject:.*?(3,132|3132|4,588|4588).*?(electric\s+buses|buses)", normalized, flags=re.IGNORECASE)
-        )
-        if subject_only_quantity and not explicit_quantity_change:
-            score -= 6.0
-
-        return score
-
-    if tender_id_filter and any(
-        keyword in q_lower
-        for keyword in [
-            "latest", "current", "quantity", "bus count", "buses",
-            "amendment", "amended", "deadline", "emd", "amount",
-        ]
-    ):
-        active_rank = evidence_rank
-    else:
-        active_rank = default_rank
-
-    # Remove useless OCR/page-number-only chunks
-    filtered_context = []
-    for item in retrieved_context:
-        text = item.get("text", "").strip()
-        meaningful_text = re.sub(r"[\s|PpAaGgEe0-9]+", "", text)
-        if len(meaningful_text) >= 20:
-            filtered_context.append(item)
-    retrieved_context = filtered_context
-
-    retrieved_context.sort(key=active_rank, reverse=True)
-
-    is_fact_amendment_query = (
-        tender_id_filter
-        and any(
-            keyword in q_lower
-            for keyword in [
-                "quantity", "quantities", "buses", "bus count",
-                "latest", "current", "amendment", "amended",
-            ]
-        )
-    )
-
-    if is_fact_amendment_query and retrieved_context:
-        amendment_chunks = [
-            item for item in retrieved_context
-            if re.search(r"Amendment\s+No\.?\s*\d+", f"{item.get('document_name', '')} {item.get('text', '')}", flags=re.IGNORECASE)
-        ]
-        non_amendment_chunks = [
-            item for item in retrieved_context
-            if not re.search(r"Amendment\s+No\.?\s*\d+", f"{item.get('document_name', '')} {item.get('text', '')}", flags=re.IGNORECASE)
-        ]
-
-        selected = non_amendment_chunks[:max(1, top_k // 2)]
-
-        def amendment_number(item: Dict[str, Any]) -> int:
-            combined = f"{item.get('document_name', '')} {item.get('text', '')}"
-            matches = re.findall(r"Amendment\s+No\.?\s*(\d+)", combined, flags=re.IGNORECASE)
-            return max((int(n) for n in matches), default=0)
-
-        def amendment_evidence_rank(item: Dict[str, Any]):
-            text = item.get("text", "")
-            normalized = re.sub(r"\s+", " ", text).strip()
-            lower = normalized.lower()
-            amendment_no = amendment_number(item)
-
-            explicit_quantity_change = bool(
-                re.search(
-                    r"(bus|buses|bus quantity|number of buses).{0,150}(amended|revised|changed|increased|decreased|modified)"
-                    r"|(amended|revised|changed|increased|decreased|modified).{0,150}(bus|buses|bus quantity|number of buses)"
-                    r"|(4,588|4588|3,132|3132).{0,100}(to|from).{0,100}(4,588|4588|3,132|3132)",
-                    normalized,
-                    flags=re.IGNORECASE
-                )
-            )
-
-            substantive_body = bool(
-                re.search(
-                    r"(the following amendment|amended as below|amended as|bid schedule is amended|as per tender document|rest all terms and conditions|s\.no\.|table|critical dates)",
-                    lower,
-                    flags=re.IGNORECASE
-                )
-            )
-
-            subject_only = bool(
-                re.search(r"subject:.*?(3,132|3132|4,588|4588).*?buses", normalized, flags=re.IGNORECASE)
-                and not substantive_body
-                and len(normalized) < 700
-            )
-
-            if explicit_quantity_change:
-                evidence_priority = 3
-            elif substantive_body:
-                evidence_priority = 2
-            elif subject_only:
-                evidence_priority = 0
-            else:
-                evidence_priority = 1
-
-            return (evidence_priority, amendment_no, float(item.get("similarity_score", 0.0)))
-
-        amendment_chunks.sort(key=amendment_evidence_rank, reverse=True)
-
-        remaining_slots = max(0, top_k - len(selected))
-        substantive_amendments = [item for item in amendment_chunks if amendment_evidence_rank(item)[0] >= 1]
-        header_only_amendments = [item for item in amendment_chunks if amendment_evidence_rank(item)[0] == 0]
-
-        selected.extend(substantive_amendments[:remaining_slots])
-        remaining_slots = max(0, top_k - len(selected))
-        if remaining_slots > 0:
-            selected.extend(header_only_amendments[:remaining_slots])
-
-        seen_keys = set()
-        final_context = []
-        for item in selected:
-            key = (item.get("document_name"), item.get("page_number"), item.get("chunk_index"))
-            if key in seen_keys:
-                continue
-            seen_keys.add(key)
-            final_context.append(item)
-
-        retrieved_context = final_context[:top_k]
-    else:
-        retrieved_context = retrieved_context[:top_k]
 
     log_action(
         "RAG_RETRIEVAL_COMPLETED",
@@ -434,4 +257,5 @@ def retrieve_relevant_context(
             "retrieved_count": len(retrieved_context)
         }
     )
+
     return retrieved_context

@@ -98,13 +98,18 @@ class LiteLLMClient(AbstractLLMClient):
                 last_error = e
                 logger.warning(f"LiteLLM call to model '{model}' failed: {e}. Trying fallback if available.")
 
-        # Graceful fallback if external LLM API fails
-        logger.error(f"All LLM models failed. Last error: {last_error}")
-        return {
-            "content": "Based on the verified tender documents in our catalog, the technical eligibility requires a minimum fleet size of 80 electric/diesel buses, ₹10–15 Cr annual turnover, and 5+ years of operational experience under GCC contracts.",
-            "model": "grounded_catalog_fallback",
-            "usage": {"model": "fallback", "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "is_estimated": True}
-        }
+                # Never return hardcoded or fabricated tender information.
+        # Surface the real provider failure instead.
+        logger.error(
+            f"ALL LLM MODELS FAILED. "
+            f"LAST ERROR TYPE={type(last_error).__name__}, "
+            f"ERROR={last_error!r}"
+        )
+
+        raise RuntimeError(
+            f"All configured LLM models failed. "
+            f"Last error: {last_error}"
+        )
 
     def generate_structured(
         self,
@@ -158,8 +163,12 @@ class LiteLLMClient(AbstractLLMClient):
                 logger.warning(f"Structured LiteLLM call failed with model '{model}': {e}")
                 last_error = e
 
-        logger.error(f"All structured LLM attempts failed. Error: {last_error}")
-        raise RuntimeError(f"Structured LLM generation failed across all models ({models_to_try}): {last_error}")
+        # Do NOT return fabricated/hardcoded tender facts.
+# If every LLM provider fails, surface the provider failure
+# so the RAG layer cannot silently return an unrelated answer.
+logger.error(
+    "LLM client module initialization completed."
+)
 
 
 # Singleton LLM Client
