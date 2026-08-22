@@ -272,8 +272,17 @@ async def list_tenders(
                 profile=profile
             )
             verdict_str = s_result.verdict.value if hasattr(s_result.verdict, "value") else str(s_result.verdict)
+            # Map CriterionDetail fields to the frontend-expected dict schema:
+            # criterion_name → criterion, verdict (enum) → status, reason → details
             criteria_list = [
-                c.model_dump() if hasattr(c, "model_dump") else dict(c)
+                {
+                    "criterion": c.criterion_name,
+                    "status": c.verdict.value if hasattr(c.verdict, "value") else str(c.verdict),
+                    "details": c.reason,
+                    "is_mandatory": c.is_mandatory,
+                    "company_value": c.company_value,
+                    "required_value": c.required_value,
+                }
                 for c in s_result.criteria_results
             ]
             screening_summary = ScreeningSummaryResponse(
@@ -285,6 +294,7 @@ async def list_tenders(
         except Exception as se:
             logger.warning(f"Catalog fallback screening failed for {meta['tender_ref']}: {se}")
             screening_summary = None
+
 
         eligibility_summary = TenderEligibilityResponse(
             minimum_fleet_size=elig_schema.minimum_fleet_size,
@@ -447,8 +457,16 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
                     tender_state=meta.get("state"), eligibility=elig_schema, profile=profile
                 )
                 verdict_str = s_result.verdict.value if hasattr(s_result.verdict, "value") else str(s_result.verdict)
+                # Map CriterionDetail fields to frontend-expected keys
                 criteria_list = [
-                    c.model_dump() if hasattr(c, "model_dump") else dict(c)
+                    {
+                        "criterion": c.criterion_name,
+                        "status": c.verdict.value if hasattr(c.verdict, "value") else str(c.verdict),
+                        "details": c.reason,
+                        "is_mandatory": c.is_mandatory,
+                        "company_value": c.company_value,
+                        "required_value": c.required_value,
+                    }
                     for c in s_result.criteria_results
                 ]
                 screening_summary = ScreeningSummaryResponse(
@@ -458,6 +476,7 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
             except Exception as se:
                 logger.warning(f"Catalog fallback screening failed for {gen_id}: {se}")
                 screening_summary = None
+
 
             eligibility_summary = TenderEligibilityResponse(
                 minimum_fleet_size=elig_schema.minimum_fleet_size,
