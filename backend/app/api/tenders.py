@@ -184,11 +184,37 @@ async def list_tenders(
         except Exception as e:
             logger.warning(f"Error formatting database tenders: {e}")
 
-    # Instant Serverless Catalog Fallback
-    from app.agent.pipeline import CATALOG
+    # Serverless Catalog Fallback — used only when DB is empty (not yet ingested).
+    # Screening is run through the REAL deterministic screen_tender_eligibility()
+    # engine (services/screening.py) against the company profile. No hardcoded
+    # verdicts or fabricated numbers — the screening logic here is exactly the
+    # same code path as post-ingestion DB-backed screening.
+    from app.agent.pipeline import CATALOG, get_or_create_default_profile
+    from app.services.screening import screen_tender_eligibility
+    from app.schemas.profile import CompanyProfileBase
+    from app.schemas.extraction import TenderEligibilitySchema, OtherRequirementItem
     from datetime import datetime, timezone
     import uuid
     import hashlib
+
+    # Build company profile (same defaults as DB-backed screening)
+    try:
+        profile_db = get_or_create_default_profile(db)
+        profile = CompanyProfileBase(
+            fleet_size=profile_db.fleet_size,
+            annual_turnover=float(profile_db.annual_turnover),
+            years_experience=profile_db.years_experience,
+            past_contract_sizes=profile_db.past_contract_sizes or [],
+            preferred_geographies=profile_db.preferred_geographies or []
+        )
+    except Exception:
+        profile = CompanyProfileBase(
+            fleet_size=120,
+            annual_turnover=150000000.0,
+            years_experience=7,
+            past_contract_sizes=[75000000.0, 90000000.0],
+            preferred_geographies=["Rajasthan", "Haryana", "Delhi", "Gujarat"]
+        )
 
     filtered = []
     now_dt = datetime.now(timezone.utc)
@@ -209,7 +235,6 @@ async def list_tenders(
         days_rem = max(0, time_diff.days)
         is_expired = time_diff.total_seconds() < 0
 
-        # Match filters
         if state_val and meta.get("state") and state_val.lower() not in meta["state"].lower():
             continue
         if search_val and search_val.lower() not in meta["title"].lower() and search_val.lower() not in meta["issuing_authority"].lower():
@@ -218,23 +243,55 @@ async def list_tenders(
         doc_hash = hashlib.sha256(fname.encode("utf-8")).hexdigest()
         t_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, meta["tender_ref"]))
 
-        screening_summary = ScreeningSummaryResponse(
-            verdict="GO" if "3" in meta["tender_ref"] or "PM-eBus" in meta["title"] else "REVIEW",
-            reasoning="Company profile meets core fleet size (120 buses), turnover, and operational experience criteria under GCC model.",
-            criteria_results=[
-                {"criterion": "Fleet Size", "status": "MET", "details": "120 buses available >= 80 required"},
-                {"criterion": "Annual Turnover", "status": "MET", "details": "₹15 Cr turnover >= ₹10 Cr required"},
-                {"criterion": "Operating Experience", "status": "MET", "details": "7 years experience >= 5 years required"}
-            ],
-            screened_at=now_dt.isoformat()
+        # Eligibility from CATALOG metadata (hand-verified ground truth)
+        cat_elig = meta.get("eligibility") or {}
+        geo = [meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"]
+        elig_schema = TenderEligibilitySchema(
+            minimum_fleet_size=cat_elig.get("minimum_fleet_size", 80),
+            minimum_annual_turnover=cat_elig.get("minimum_annual_turnover", 1000000000.0),
+            minimum_experience_years=cat_elig.get("minimum_experience_years", 5),
+            minimum_past_contract_value=cat_elig.get("minimum_past_contract_value", 500000000.0),
+            required_geographies=cat_elig.get("required_geographies", geo),
+            other_requirements=[
+                OtherRequirementItem(
+                    requirement_text="GCC bus operations experience required — verify against original RFP.",
+                    is_mandatory=False,
+                    page_number=None,
+                    clause_ref=None
+                )
+            ]
         )
 
+        # Run real deterministic screening engine — same code path as DB-backed
+        try:
+            s_result = screen_tender_eligibility(
+                tender_id=t_id,
+                tender_title=meta["title"],
+                tender_state=meta.get("state"),
+                eligibility=elig_schema,
+                profile=profile
+            )
+            verdict_str = s_result.verdict.value if hasattr(s_result.verdict, "value") else str(s_result.verdict)
+            criteria_list = [
+                c.model_dump() if hasattr(c, "model_dump") else dict(c)
+                for c in s_result.criteria_results
+            ]
+            screening_summary = ScreeningSummaryResponse(
+                verdict=verdict_str,
+                reasoning=s_result.reasoning,
+                criteria_results=criteria_list,
+                screened_at=now_dt.isoformat()
+            )
+        except Exception as se:
+            logger.warning(f"Catalog fallback screening failed for {meta['tender_ref']}: {se}")
+            screening_summary = None
+
         eligibility_summary = TenderEligibilityResponse(
-            minimum_fleet_size=80,
-            minimum_annual_turnover=100000000.0,
-            minimum_experience_years=5,
-            minimum_past_contract_value=50000000.0,
-            required_geographies=[meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"],
+            minimum_fleet_size=elig_schema.minimum_fleet_size,
+            minimum_annual_turnover=float(elig_schema.minimum_annual_turnover) if elig_schema.minimum_annual_turnover is not None else None,
+            minimum_experience_years=elig_schema.minimum_experience_years,
+            minimum_past_contract_value=float(elig_schema.minimum_past_contract_value) if elig_schema.minimum_past_contract_value is not None else None,
+            required_geographies=elig_schema.required_geographies,
             other_requirements=[]
         )
 
@@ -244,6 +301,9 @@ async def list_tenders(
             issuing_authority=meta["issuing_authority"],
             city=meta.get("city"),
             state=meta.get("state"),
+            original_bus_quantity=meta.get("original_bus_quantity"),
+            latest_bus_quantity=meta.get("latest_bus_quantity"),
+            latest_quantity_source=meta.get("latest_quantity_source"),
             category="bus_operations",
             submission_deadline=deadline_dt.isoformat(),
             timezone="Asia/Kolkata",
@@ -343,9 +403,70 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
             is_expired = time_diff.total_seconds() < 0
             doc_hash = hashlib.sha256(fname.encode("utf-8")).hexdigest()
 
-            screening_summary = None
+            # Build profile and eligibility, then run real screening engine
+            from app.services.screening import screen_tender_eligibility
+            from app.schemas.profile import CompanyProfileBase
+            from app.schemas.extraction import TenderEligibilitySchema, OtherRequirementItem
+            from app.agent.pipeline import get_or_create_default_profile
 
-            eligibility_summary = None
+            try:
+                profile_db = get_or_create_default_profile(db)
+                profile = CompanyProfileBase(
+                    fleet_size=profile_db.fleet_size,
+                    annual_turnover=float(profile_db.annual_turnover),
+                    years_experience=profile_db.years_experience,
+                    past_contract_sizes=profile_db.past_contract_sizes or [],
+                    preferred_geographies=profile_db.preferred_geographies or []
+                )
+            except Exception:
+                profile = CompanyProfileBase(
+                    fleet_size=120, annual_turnover=150000000.0, years_experience=7,
+                    past_contract_sizes=[75000000.0, 90000000.0],
+                    preferred_geographies=["Rajasthan", "Haryana", "Delhi", "Gujarat"]
+                )
+
+            cat_elig = meta.get("eligibility") or {}
+            geo = [meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"]
+            elig_schema = TenderEligibilitySchema(
+                minimum_fleet_size=cat_elig.get("minimum_fleet_size", 80),
+                minimum_annual_turnover=cat_elig.get("minimum_annual_turnover", 1000000000.0),
+                minimum_experience_years=cat_elig.get("minimum_experience_years", 5),
+                minimum_past_contract_value=cat_elig.get("minimum_past_contract_value", 500000000.0),
+                required_geographies=cat_elig.get("required_geographies", geo),
+                other_requirements=[
+                    OtherRequirementItem(
+                        requirement_text="GCC bus operations experience required — verify against original RFP.",
+                        is_mandatory=False, page_number=None, clause_ref=None
+                    )
+                ]
+            )
+
+            try:
+                s_result = screen_tender_eligibility(
+                    tender_id=gen_id, tender_title=meta["title"],
+                    tender_state=meta.get("state"), eligibility=elig_schema, profile=profile
+                )
+                verdict_str = s_result.verdict.value if hasattr(s_result.verdict, "value") else str(s_result.verdict)
+                criteria_list = [
+                    c.model_dump() if hasattr(c, "model_dump") else dict(c)
+                    for c in s_result.criteria_results
+                ]
+                screening_summary = ScreeningSummaryResponse(
+                    verdict=verdict_str, reasoning=s_result.reasoning,
+                    criteria_results=criteria_list, screened_at=now_dt.isoformat()
+                )
+            except Exception as se:
+                logger.warning(f"Catalog fallback screening failed for {gen_id}: {se}")
+                screening_summary = None
+
+            eligibility_summary = TenderEligibilityResponse(
+                minimum_fleet_size=elig_schema.minimum_fleet_size,
+                minimum_annual_turnover=float(elig_schema.minimum_annual_turnover) if elig_schema.minimum_annual_turnover is not None else None,
+                minimum_experience_years=elig_schema.minimum_experience_years,
+                minimum_past_contract_value=float(elig_schema.minimum_past_contract_value) if elig_schema.minimum_past_contract_value is not None else None,
+                required_geographies=elig_schema.required_geographies,
+                other_requirements=[]
+            )
 
             return TenderResponse(
                 id=gen_id,
@@ -353,6 +474,9 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
                 issuing_authority=meta["issuing_authority"],
                 city=meta.get("city"),
                 state=meta.get("state"),
+                original_bus_quantity=meta.get("original_bus_quantity"),
+                latest_bus_quantity=meta.get("latest_bus_quantity"),
+                latest_quantity_source=meta.get("latest_quantity_source"),
                 category="bus_operations",
                 submission_deadline=deadline_dt.isoformat(),
                 timezone="Asia/Kolkata",
