@@ -9,21 +9,16 @@ from app.core.logging import logger
 
 
 def get_engine():
-    # Attempt connecting to configured DATABASE_URL
-    try:
-        if settings.DATABASE_URL.startswith("postgresql"):
-            test_engine = create_engine(
-                settings.DATABASE_URL,
-                pool_pre_ping=True,
-                pool_size=5,
-                max_overflow=10,
-                connect_args={"connect_timeout": 3}
-            )
-            with test_engine.connect():
-                logger.info("Connected successfully to PostgreSQL database.")
-            return test_engine
-    except Exception as e:
-        logger.warning(f"PostgreSQL connection offline ({e}). Initializing high-performance local SQLite store.")
+    # Use configured DATABASE_URL directly
+    if settings.DATABASE_URL.startswith("postgresql"):
+        engine = create_engine(
+            settings.DATABASE_URL,
+            pool_pre_ping=True,
+            pool_size=5,
+            max_overflow=10,
+            connect_args={"connect_timeout": 10}
+        )
+        return engine
 
     # Fallback to local SQLite database (uses /tmp on Vercel serverless)
     if os.environ.get("VERCEL"):
