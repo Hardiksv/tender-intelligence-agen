@@ -136,11 +136,18 @@ export default function Dashboard({ onSelectTender }) {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {tenders.map((t) => {
+            const isExpired = t.is_expired === true;
             const verdict = t.screening?.verdict || 'PENDING';
-            const verdictColor = 
-              verdict === 'GO' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-              verdict === 'NO-GO' ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
-              'bg-amber-500/10 text-amber-400 border-amber-500/30';
+            const displayStatus = isExpired ? 'EXPIRED' : verdict;
+
+            const verdictColor =
+              isExpired
+                ? 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+                : verdict === 'GO'
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                : verdict === 'NO-GO'
+                ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                : 'bg-amber-500/10 text-amber-400 border-amber-500/30';
 
             return (
               <div
@@ -151,7 +158,7 @@ export default function Dashboard({ onSelectTender }) {
                 <div className="space-y-1.5 max-w-2xl">
                   <div className="flex items-center gap-2">
                     <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full border ${verdictColor}`}>
-                      {verdict}
+                      {displayStatus}
                     </span>
                     <span className="text-xs text-slate-400">
                       {t.city ? `${t.city}, ` : ''}{t.state}
