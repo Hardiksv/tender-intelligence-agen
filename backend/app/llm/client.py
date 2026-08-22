@@ -163,12 +163,20 @@ class LiteLLMClient(AbstractLLMClient):
                 logger.warning(f"Structured LiteLLM call failed with model '{model}': {e}")
                 last_error = e
 
-        # Do NOT return fabricated/hardcoded tender facts.
-# If every LLM provider fails, surface the provider failure
-# so the RAG layer cannot silently return an unrelated answer.
-logger.error(
-    "LLM client module initialization completed."
-)
+        # Do NOT return fabricated/hardcoded tender facts, and do NOT fall off
+        # the end of the function returning None — a caller expecting a dict
+        # with a "data" key would hit an unhandled AttributeError instead of a
+        # clear, catchable failure. Surface the real provider failure instead.
+        logger.error(
+            f"ALL STRUCTURED LLM MODELS FAILED. "
+            f"LAST ERROR TYPE={type(last_error).__name__}, "
+            f"ERROR={last_error!r}"
+        )
+
+        raise RuntimeError(
+            f"All configured LLM models failed for structured generation. "
+            f"Last error: {last_error}"
+        )
 
 
 # Singleton LLM Client

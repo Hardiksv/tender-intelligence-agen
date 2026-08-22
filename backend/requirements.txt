@@ -15,3 +15,4 @@ pytest-asyncio>=0.23.5
 python-multipart>=0.0.9
 mcp>=1.0.0
 tzdata
+sentence-transformers>=2.2.0

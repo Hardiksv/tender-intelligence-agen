@@ -13,7 +13,7 @@ backend_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if backend_root not in sys.path:
     sys.path.insert(0, backend_root)
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP
 
 from app.db.database import SessionLocal
 from app.db.models import Tender
@@ -21,7 +21,7 @@ from app.schemas.chat import ChatRequest
 from app.services.rag import answer_tender_question
 from app.core.logging import log_action
 
-server = MCPServer("tender-intelligence-agent")
+server = FastMCP("tender-intelligence-agent")
 
 
 @server.tool()

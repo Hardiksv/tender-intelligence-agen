@@ -27,10 +27,11 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/tender_test
-      LLM_API_KEY: mock_key_for_testing
-      LLM_MODEL: gemini/gemini-flash-latest
-      LLM_FALLBACK_MODEL: gemini/gemini-2.5-flash-lite
-      EMBEDDING_MODEL: gemini/gemini-embedding-001
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY || 'mock_key_for_testing' }}
+      LLM_MODEL: groq/openai/gpt-oss-120b
+      LLM_FALLBACK_MODEL: groq/qwen/qwen3.6-27b
+      EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY || 'mock_key_for_testing' }}
+      EMBEDDING_MODEL: jina-embeddings-v5-omni-small
       EMBEDDING_DIMENSION: "768"
       TIMEZONE: Asia/Kolkata
       FRONTEND_ORIGIN: http://localhost:5173
