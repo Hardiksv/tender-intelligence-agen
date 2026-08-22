@@ -141,32 +141,36 @@ const loadTender = async () => {
     </thead>
 
     <tbody className="divide-y divide-slate-800/60">
-      {(screening.criteria_results || []).map((c, idx) => {
-        const statusColor =
-          c.status === 'MET'
-            ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
-            : c.status === 'FAIL'
-            ? 'text-rose-400 bg-rose-500/10 border-rose-500/30'
-            : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+        {(screening.criteria_results || []).map((c, idx) => {
+          const criterionName = c.criterion || c.criterion_name;
+          const statusVal = c.status || (c.verdict === 'PASS' ? 'MET' : c.verdict);
+          const detailsVal = c.details || c.reason;
 
-        return (
-          <tr key={idx} className="hover:bg-slate-900/40">
-            <td className="py-3 px-3 font-semibold text-slate-200">
-              {c.criterion}
-            </td>
+          const statusColor =
+            statusVal === 'MET' || statusVal === 'PASS'
+              ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+              : statusVal === 'FAIL'
+              ? 'text-rose-400 bg-rose-500/10 border-rose-500/30'
+              : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
 
-            <td className="py-3 px-3">
-              <span
-                className={`px-2 py-0.5 rounded-full border text-[10px] font-extrabold ${statusColor}`}
-              >
-                {c.status}
-              </span>
-            </td>
+          return (
+            <tr key={idx} className="hover:bg-slate-900/40">
+              <td className="py-3 px-3 font-semibold text-slate-200">
+                {criterionName}
+              </td>
 
-            <td className="py-3 px-3 text-slate-400 leading-relaxed">
-              {c.details}
-            </td>
-          </tr>
+              <td className="py-3 px-3">
+                <span
+                  className={`px-2 py-0.5 rounded-full border text-[10px] font-extrabold ${statusColor}`}
+                >
+                  {statusVal}
+                </span>
+              </td>
+
+              <td className="py-3 px-3 text-slate-400 leading-relaxed max-w-lg">
+                {detailsVal}
+              </td>
+            </tr>
         );
       })}
     </tbody>
