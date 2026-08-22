@@ -209,11 +209,19 @@ def retrieve_relevant_context(
                         emb = chunk.embedding
                         if isinstance(emb, list):
                             emb_arr = np.array(emb, dtype=np.float32)
-                            if len(q_arr) == len(emb_arr):
+                            
+                            # Handle dimension mismatch (e.g., legacy 384-dim chunks vs padded 768-dim query)
+                            if len(q_arr) != len(emb_arr):
+                                min_dim = min(len(q_arr), len(emb_arr))
+                                q_compare = q_arr[:min_dim]
+                                emb_compare = emb_arr[:min_dim]
+                                q_compare_norm = np.linalg.norm(q_compare)
+                                denom = q_compare_norm * np.linalg.norm(emb_compare)
+                                sim = float(np.dot(q_compare, emb_compare) / denom) if denom > 0 else 0.0
+                            else:
                                 denom = q_norm * np.linalg.norm(emb_arr)
                                 sim = float(np.dot(q_arr, emb_arr) / denom) if denom > 0 else 0.0
-                            else:
-                                sim = 0.5
+                                
                             scored_rows.append((sim, chunk, title, file_name))
 
                     scored_rows.sort(key=lambda x: x[0], reverse=True)
