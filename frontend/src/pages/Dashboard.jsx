@@ -18,6 +18,10 @@ export default function Dashboard({ onSelectTender }) {
         verdict: selectedVerdict,
         state: selectedState
       });
+      console.log("SCREENING RAW:", data.tenders?.[0]?.screening);
+      console.log("SCREENING TYPE:", typeof data.tenders?.[0]?.screening);
+      console.log("VERDICT RAW:", data.tenders?.[0]?.screening?.verdict);
+      console.log("VERDICT TYPE:", typeof data.tenders?.[0]?.screening?.verdict);
       setTenders(data.tenders || []);
     } catch (err) {
       console.error("Failed to load tenders:", err);
@@ -30,24 +34,24 @@ export default function Dashboard({ onSelectTender }) {
     loadData();
   }, [searchQuery, selectedVerdict, selectedState]);
 
-// Dashboard counters consider only active tenders.
 const total = tenders.length;
 
-const activeTenders = tenders.filter(
-  t => t.is_expired !== true
-);
-
-const goCount = activeTenders.filter(
+const goCount = tenders.filter(
   t => t.screening?.verdict === 'GO'
 ).length;
 
-const noGoCount = activeTenders.filter(
+const noGoCount = tenders.filter(
   t => t.screening?.verdict === 'NO-GO'
 ).length;
 
-const reviewCount = activeTenders.filter(
+const reviewCount = tenders.filter(
   t => t.screening?.verdict === 'REVIEW'
 ).length;
+
+const expiredCount = tenders.filter(
+  t => t.is_expired === true
+).length;
+
 
   return (
     <div className="space-y-6">

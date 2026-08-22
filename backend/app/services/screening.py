@@ -129,13 +129,33 @@ def screen_tender_eligibility(
 
     if has_mandatory_failure:
         final_verdict = FinalVerdict.NO_GO
-        summary = "NO-GO: One or more mandatory eligibility requirements were not met by the company profile."
+
+        failed_criteria = [
+        c.reason
+        for c in criteria
+        if c.verdict == CriterionVerdict.FAIL and c.is_mandatory
+    ]
+
+        summary = "NO-GO: " + " ".join(failed_criteria)
+
     elif has_any_review:
         final_verdict = FinalVerdict.REVIEW
-        summary = "REVIEW: All mandatory numeric thresholds passed, but specific non-mandatory or qualitative clauses require manual review."
+
+        review_reasons = [
+            c.reason
+            for c in criteria
+            if c.verdict == CriterionVerdict.REVIEW
+        ]
+
+        summary = (
+            "REVIEW: All mandatory eligibility criteria passed, "
+            "but manual review is required. "
+            + " ".join(review_reasons)
+        )
+
     else:
         final_verdict = FinalVerdict.GO
-        summary = "GO: All mandatory and optional eligibility criteria fully satisfied."
+        summary = "GO: All evaluated eligibility criteria are satisfied."
 
     result = ScreeningResultSchema(
         tender_id=str(tender_id),

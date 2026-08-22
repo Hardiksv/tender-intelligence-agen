@@ -10,6 +10,11 @@ from app.schemas.tender import TenderResponse, TenderListResponse, ScreeningSumm
 from app.core.logging import logger
 from zoneinfo import ZoneInfo
 
+from app.services.screening import screen_tender_eligibility
+from app.schemas.profile import CompanyProfileBase
+from app.schemas.extraction import TenderEligibilitySchema, OtherRequirementItem
+from app.agent.pipeline import get_or_create_default_profile
+
 router = APIRouter(prefix="/api/tenders", tags=["Tenders"])
 
 
@@ -119,11 +124,13 @@ async def list_tenders(
     state: Optional[str] = Query(default=None, description="Filter tenders by state"),
     verdict: Optional[str] = Query(default=None, description="Filter tenders by GO / NO-GO / REVIEW verdict"),
     search: Optional[str] = Query(default=None, description="Search term in title or authority"),
+    city: Optional[str] = Query(default=None, description="Filter tenders by city"),
     db: Session = Depends(get_db)
 ):
     state_val = state if isinstance(state, str) else None
     verdict_val = verdict if isinstance(verdict, str) else None
     search_val = search if isinstance(search, str) else None
+    city_val = city if isinstance(city, str) else None
 
     tenders = []
     try:
@@ -136,19 +143,45 @@ async def list_tenders(
     if tenders:
         try:
             filtered = []
+
             for t in tenders:
                 resp = format_tender_response(t)
+                # Dashboard/API default should only expose active tenders.
+                # Expired tenders remain accessible through the individual tender endpoint.
+                # if resp.is_expired:
+                #     continue
 
-                if state_val and t.state and state_val.lower() not in t.state.lower():
+                if state_val and (
+                    not t.state or state_val.lower() not in t.state.lower()
+                 ):
                     continue
-                if verdict_val and resp.screening and resp.screening.verdict.upper() != verdict_val.upper():
+
+                if city_val and (
+                    not t.city or city_val.lower() not in t.city.lower()
+                ):
                     continue
-                if search_val and search_val.lower() not in t.title.lower() and search_val.lower() not in t.issuing_authority.lower():
+                if verdict_val and (
+                    not resp.screening
+                    or resp.screening.verdict.upper() != verdict_val.upper()
+                 ):
                     continue
+
+                if search_val:
+                    search_lower = search_val.lower()
+
+                    if (
+                        search_lower not in t.title.lower()
+                        and search_lower not in t.issuing_authority.lower()
+                    ):
+                        continue
 
                 filtered.append(resp)
-            if filtered:
-                return TenderListResponse(total=len(filtered), tenders=filtered)
+
+            return TenderListResponse(
+                total=len(filtered),
+                tenders=filtered
+            )
+
         except Exception as e:
             logger.warning(f"Error formatting database tenders: {e}")
 
@@ -186,25 +219,8 @@ async def list_tenders(
         doc_hash = hashlib.sha256(fname.encode("utf-8")).hexdigest()
         t_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, meta["tender_ref"]))
 
-        screening_summary = ScreeningSummaryResponse(
-            verdict="GO" if "3" in meta["tender_ref"] or "PM-eBus" in meta["title"] else "REVIEW",
-            reasoning="Company profile meets core fleet size (120 buses), turnover, and operational experience criteria under GCC model.",
-            criteria_results=[
-                {"criterion": "Fleet Size", "status": "MET", "details": "120 buses available >= 80 required"},
-                {"criterion": "Annual Turnover", "status": "MET", "details": "₹15 Cr turnover >= ₹10 Cr required"},
-                {"criterion": "Operating Experience", "status": "MET", "details": "7 years experience >= 5 years required"}
-            ],
-            screened_at=now_dt.isoformat()
-        )
 
-        eligibility_summary = TenderEligibilityResponse(
-            minimum_fleet_size=80,
-            minimum_annual_turnover=100000000.0,
-            minimum_experience_years=5,
-            minimum_past_contract_value=50000000.0,
-            required_geographies=[meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"],
-            other_requirements=[]
-        )
+        eligibility_summary = None
 
         resp = TenderResponse(
             id=t_id,
@@ -311,25 +327,9 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
             is_expired = time_diff.total_seconds() < 0
             doc_hash = hashlib.sha256(fname.encode("utf-8")).hexdigest()
 
-            screening_summary = ScreeningSummaryResponse(
-                verdict="GO" if "3" in meta["tender_ref"] or "PM-eBus" in meta["title"] else "REVIEW",
-                reasoning="Company profile meets core fleet size (120 buses), turnover, and operational experience criteria under GCC model.",
-                criteria_results=[
-                    {"criterion": "Fleet Size", "status": "MET", "details": "120 buses available >= 80 required"},
-                    {"criterion": "Annual Turnover", "status": "MET", "details": "₹15 Cr turnover >= ₹10 Cr required"},
-                    {"criterion": "Operating Experience", "status": "MET", "details": "7 years experience >= 5 years required"}
-                ],
-                screened_at=now_dt.isoformat()
-            )
+            screening_summary = None
 
-            eligibility_summary = TenderEligibilityResponse(
-                minimum_fleet_size=80,
-                minimum_annual_turnover=100000000.0,
-                minimum_experience_years=5,
-                minimum_past_contract_value=50000000.0,
-                required_geographies=[meta.get("state")] if meta.get("state") and meta.get("state") != "National" else ["National"],
-                other_requirements=[]
-            )
+            eligibility_summary = None
 
             return TenderResponse(
                 id=gen_id,

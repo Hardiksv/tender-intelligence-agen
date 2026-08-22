@@ -9,20 +9,26 @@ export default function TenderDetail({ tenderId, onBack }) {
   const [screening, setScreening] = useState(null);
   const [rescreening, setRescreening] = useState(false);
 
-  const loadTender = async () => {
-    try {
-      setLoading(true);
-      const data = await fetchTenderById(tenderId);
-      setTender(data);
-      if (data.screening) {
-        setScreening(data.screening);
-      }
-    } catch (err) {
-      console.error("Failed to load tender details:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+const loadTender = async () => {
+  try {
+    setLoading(true);
+    setScreening(null);
+
+    const data = await fetchTenderById(tenderId);
+
+    console.log("TENDER DETAIL API:", data);
+    console.log("TENDER DETAIL SCREENING:", data.screening);
+
+    setTender(data);
+    setScreening(data.screening ?? null);
+  } catch (err) {
+    console.error("Failed to load tender details:", err);
+    setTender(null);
+    setScreening(null);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     if (tenderId) loadTender();
@@ -123,48 +129,50 @@ export default function TenderDetail({ tenderId, onBack }) {
             <strong className="text-slate-200">Verdict Rationale:</strong> {screening.reasoning}
           </div>
 
-          {/* Detailed Criteria Audit Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800 text-slate-400 bg-slate-900/50">
-                  <th className="py-2.5 px-3">Criterion Name</th>
-                  <th className="py-2.5 px-3">Mandatory?</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3">Company Value</th>
-                  <th className="py-2.5 px-3">Required Threshold</th>
-                  <th className="py-2.5 px-3">Reasoning Explanation</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {screening.criteria_results.map((c, idx) => {
-                  const statusColor = 
-                    c.verdict === 'PASS' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
-                    c.verdict === 'FAIL' ? 'text-rose-400 bg-rose-500/10 border-rose-500/30' :
-                    'text-amber-400 bg-amber-500/10 border-amber-500/30';
+{/* Detailed Criteria Audit Table */}
+<div className="overflow-x-auto">
+  <table className="w-full text-left text-xs border-collapse">
+    <thead>
+      <tr className="border-b border-slate-800 text-slate-400 bg-slate-900/50">
+        <th className="py-2.5 px-3">Criterion</th>
+        <th className="py-2.5 px-3">Status</th>
+        <th className="py-2.5 px-3">Details</th>
+      </tr>
+    </thead>
 
-                  return (
-                    <tr key={idx} className="hover:bg-slate-900/40">
-                      <td className="py-3 px-3 font-semibold text-slate-200">{c.criterion_name}</td>
-                      <td className="py-3 px-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.is_mandatory ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'bg-slate-800 text-slate-400'}`}>
-                          {c.is_mandatory ? 'MANDATORY' : 'OPTIONAL'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className={`px-2 py-0.5 rounded-full border text-[10px] font-extrabold ${statusColor}`}>
-                          {c.verdict}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-slate-300 font-mono">{String(c.company_value)}</td>
-                      <td className="py-3 px-3 text-slate-300 font-mono">{String(c.required_value)}</td>
-                      <td className="py-3 px-3 text-slate-400 leading-relaxed">{c.reason}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+    <tbody className="divide-y divide-slate-800/60">
+      {(screening.criteria_results || []).map((c, idx) => {
+        const statusColor =
+          c.status === 'MET'
+            ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+            : c.status === 'FAIL'
+            ? 'text-rose-400 bg-rose-500/10 border-rose-500/30'
+            : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+
+        return (
+          <tr key={idx} className="hover:bg-slate-900/40">
+            <td className="py-3 px-3 font-semibold text-slate-200">
+              {c.criterion}
+            </td>
+
+            <td className="py-3 px-3">
+              <span
+                className={`px-2 py-0.5 rounded-full border text-[10px] font-extrabold ${statusColor}`}
+              >
+                {c.status}
+              </span>
+            </td>
+
+            <td className="py-3 px-3 text-slate-400 leading-relaxed">
+              {c.details}
+            </td>
+          </tr>
+        );
+      })}
+    </tbody>
+  </table>
+</div>
+
         </div>
       )}
 
