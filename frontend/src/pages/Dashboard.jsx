@@ -30,11 +30,24 @@ export default function Dashboard({ onSelectTender }) {
     loadData();
   }, [searchQuery, selectedVerdict, selectedState]);
 
-  // Aggregate Counters
-  const total = tenders.length;
-  const goCount = tenders.filter(t => t.screening?.verdict === 'GO').length;
-  const noGoCount = tenders.filter(t => t.screening?.verdict === 'NO-GO').length;
-  const reviewCount = tenders.filter(t => t.screening?.verdict === 'REVIEW').length;
+// Dashboard counters consider only active tenders.
+const total = tenders.length;
+
+const activeTenders = tenders.filter(
+  t => t.is_expired !== true
+);
+
+const goCount = activeTenders.filter(
+  t => t.screening?.verdict === 'GO'
+).length;
+
+const noGoCount = activeTenders.filter(
+  t => t.screening?.verdict === 'NO-GO'
+).length;
+
+const reviewCount = activeTenders.filter(
+  t => t.screening?.verdict === 'REVIEW'
+).length;
 
   return (
     <div className="space-y-6">
@@ -46,7 +59,7 @@ export default function Dashboard({ onSelectTender }) {
           <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Tenders</p>
           <div className="flex items-baseline justify-between mt-2">
             <span className="text-3xl font-extrabold text-white font-heading">{total}</span>
-            <span className="text-xs text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">Active Pool</span>
+            <span className="text-xs text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">All Tenders</span>
           </div>
         </div>
 
