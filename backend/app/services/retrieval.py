@@ -1,13 +1,14 @@
-from typing import List, Dict, Any, Optional
 import os
 import re
-from datetime import datetime, timedelta, timezone
-from sqlalchemy.orm import Session
-from sqlalchemy import select
+from datetime import UTC, datetime, timedelta, timezone
+from typing import Any, Optional
 
-from app.db.models import Tender, DocumentChunk, Document
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.logging import log_action, logger
+from app.db.models import Document, DocumentChunk, Tender
 from app.services.embeddings import generate_embedding
-from app.core.logging import logger, log_action
 
 
 def route_query_type(question: str) -> str:
@@ -23,9 +24,9 @@ def route_query_type(question: str) -> str:
 def retrieve_relevant_context(
     db: Session,
     question: str,
-    tender_id_filter: Optional[str] = None,
+    tender_id_filter: str | None = None,
     top_k: int = 5
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Hybrid retriever combining SQL date queries and pgvector cosine similarity search.
 
@@ -37,7 +38,7 @@ def retrieve_relevant_context(
     paper over.
     """
     query_type = route_query_type(question)
-    retrieved_context: List[Dict[str, Any]] = []
+    retrieved_context: list[dict[str, Any]] = []
 
         # Deterministic lexical retrieval for exact tender facts.
     # This complements semantic search for questions about quantities,
@@ -113,9 +114,7 @@ def retrieve_relevant_context(
 
     if query_type == "STRUCTURED_SQL":
         # Deadline query logic: tenders closing in next 15 days
-        now_dt = datetime.now(timezone.utc)
-        future_dt = now_dt + timedelta(days=30)
-
+        now_dt = datetime.now(UTC)
         stmt = select(Tender).where(Tender.submission_deadline >= now_dt)
         if tender_id_filter:
             stmt = stmt.where(Tender.id == tender_id_filter)
@@ -124,7 +123,7 @@ def retrieve_relevant_context(
         for t in tenders:
             dl = t.submission_deadline
             if dl.tzinfo is None:
-                dl = dl.replace(tzinfo=timezone.utc)
+                dl = dl.replace(tzinfo=UTC)
             days_left = (dl - now_dt).days
             raw_fname = os.path.basename(t.raw_document_path) if t.raw_document_path else "RFP.pdf"
             retrieved_context.append({
@@ -258,17 +257,16 @@ def retrieve_relevant_context(
     # A later amendment number does NOT automatically mean that
     # the amendment changed the requested fact.
     # ------------------------------------------------------------------
-    def default_rank(item: Dict[str, Any]) -> float:
+    def default_rank(item: dict[str, Any]) -> float:
         return float(item.get("similarity_score", 0.0))
 
-    def evidence_rank(item: Dict[str, Any]) -> float:
+    def evidence_rank(item: dict[str, Any]) -> float:
         text = item.get("text", "")
         document_name = item.get("document_name", "")
         score = float(item.get("similarity_score", 0.0))
         normalized = re.sub(r"\s+", " ", text).strip()
 
         has_4588 = bool(re.search(r"\b4,588\b|\b4588\b", normalized))
-        has_3132 = bool(re.search(r"\b3,132\b|\b3132\b", normalized))
         if has_4588:
             score += 5.0
 
@@ -355,12 +353,12 @@ def retrieve_relevant_context(
 
         selected = non_amendment_chunks[:max(1, top_k // 2)]
 
-        def amendment_number(item: Dict[str, Any]) -> int:
+        def amendment_number(item: dict[str, Any]) -> int:
             combined = f"{item.get('document_name', '')} {item.get('text', '')}"
             matches = re.findall(r"Amendment\s+No\.?\s*(\d+)", combined, flags=re.IGNORECASE)
             return max((int(n) for n in matches), default=0)
 
-        def amendment_evidence_rank(item: Dict[str, Any]):
+        def amendment_evidence_rank(item: dict[str, Any]):
             text = item.get("text", "")
             normalized = re.sub(r"\s+", " ", text).strip()
             lower = normalized.lower()

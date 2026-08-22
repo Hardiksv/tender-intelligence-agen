@@ -1,8 +1,9 @@
 import json
 import os
-from typing import Type, TypeVar, Optional, Dict, Any
-from pydantic import BaseModel
+from typing import Any, Optional, TypeVar
+
 import litellm
+from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -25,7 +26,7 @@ class LiteLLMClient(AbstractLLMClient):
         self.fallback_model = settings.LLM_FALLBACK_MODEL
         self.api_key = settings.LLM_API_KEY
 
-    def _extract_usage(self, response: Any, model_used: str, request_type: str) -> Dict[str, Any]:
+    def _extract_usage(self, response: Any, model_used: str, request_type: str) -> dict[str, Any]:
         """Extracts token usage metadata from LiteLLM response."""
         usage_meta = {
             "model": model_used,
@@ -47,10 +48,10 @@ class LiteLLMClient(AbstractLLMClient):
     def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.0,
         max_tokens: int = 2000
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -114,10 +115,10 @@ class LiteLLMClient(AbstractLLMClient):
     def generate_structured(
         self,
         prompt: str,
-        response_model: Type[T],
-        system_prompt: Optional[str] = None,
+        response_model: type[T],
+        system_prompt: str | None = None,
         temperature: float = 0.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})

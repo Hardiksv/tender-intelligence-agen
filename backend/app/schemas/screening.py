@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import List, Any
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 
 class CriterionVerdict(str, Enum):
@@ -28,5 +29,5 @@ class ScreeningResultSchema(BaseModel):
     tender_id: str
     verdict: FinalVerdict
     reasoning: str
-    criteria_results: List[CriterionDetail]
+    criteria_results: list[CriterionDetail]
     screened_at: str

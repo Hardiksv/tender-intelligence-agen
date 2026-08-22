@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Any
 
 # Verified Pricing for Gemini 2.5 Flash via Web Search (2026)
 INPUT_TOKEN_PRICE_PER_1M = 0.30    # $0.30 per 1,000,000 input tokens
@@ -6,7 +6,7 @@ OUTPUT_TOKEN_PRICE_PER_1M = 2.50   # $2.50 per 1,000,000 output tokens
 USD_TO_INR = 85.0                  # Standard exchange conversion
 
 
-def calculate_llm_cost(usage: Dict[str, Any]) -> Dict[str, Any]:
+def calculate_llm_cost(usage: dict[str, Any]) -> dict[str, Any]:
     """
     Calculates cost based on token usage metadata from LiteLLM.
     Uses verified Gemini 2.5 Flash pricing.

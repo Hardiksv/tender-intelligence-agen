@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlalchemy.orm import Session
 
-from app.db.database import get_db, Base
+from app.agent.pipeline import run_ingestion_pipeline
+from app.core.exceptions import ConcurrentIngestionException
+from app.core.logging import logger
+from app.db.database import Base, get_db
 from app.db.models import IngestionJob, IngestionStatusEnum
 from app.schemas.ingestion import IngestionJobResponse
-from app.core.exceptions import ConcurrentIngestionException
-from app.agent.pipeline import run_ingestion_pipeline
-from app.core.logging import logger
 
 router = APIRouter(prefix="/api/ingestion", tags=["Ingestion"])
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/ingestion", tags=["Ingestion"])
 @router.post("/run", response_model=IngestionJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_ingestion_run(
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db)  # noqa: B008
 ):
     """
     Triggers asynchronous background ingestion of seed PDF tender documents.
@@ -69,7 +69,7 @@ async def trigger_ingestion_run(
 
 
 @router.get("/{job_id}", response_model=IngestionJobResponse)
-async def get_ingestion_job_status(job_id: str, db: Session = Depends(get_db)):
+async def get_ingestion_job_status(job_id: str, db: Session = Depends(get_db)):  # noqa: B008
     try:
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
     except Exception:

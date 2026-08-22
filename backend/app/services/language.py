@@ -1,12 +1,13 @@
-from langdetect import detect, DetectorFactory
-from typing import Tuple
-from app.core.logging import logger, log_action
+
+from langdetect import DetectorFactory, detect
+
+from app.core.logging import log_action, logger
 
 # Set seed for deterministic language detection
 DetectorFactory.seed = 0
 
 
-def detect_document_language(full_text: str) -> Tuple[bool, str]:
+def detect_document_language(full_text: str) -> tuple[bool, str]:
     """
     Detects predominant document language.
     Returns (is_english: bool, detected_lang_code: str).

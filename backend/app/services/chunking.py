@@ -1,17 +1,17 @@
 import re
-from typing import List, Dict, Any
+from typing import Any
 
 
 def chunk_document_pages(
-    pages: List[Dict[str, Any]],
+    pages: list[dict[str, Any]],
     target_chunk_size: int = 800,
     overlap: int = 150
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Semantically chunks page-aware document text while preserving page number metadata
     and clause boundaries.
     """
-    chunks: List[Dict[str, Any]] = []
+    chunks: list[dict[str, Any]] = []
     chunk_index = 0
 
     for page_item in pages:

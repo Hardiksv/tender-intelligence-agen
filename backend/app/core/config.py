@@ -1,5 +1,6 @@
 import os
 from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,7 +11,7 @@ class Settings(BaseSettings):
     """
     # Database Settings
     DATABASE_URL: str = "sqlite:///tender_intelligence.db"
-    TEST_DATABASE_URL: Optional[str] = None
+    TEST_DATABASE_URL: str | None = None
 
     # LLM Settings (Groq / LiteLLM)
     LLM_API_KEY: str = ""

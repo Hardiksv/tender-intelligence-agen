@@ -1,12 +1,12 @@
 import os
-from typing import List
+
 from sqlalchemy.orm import Session
 
-from app.core.logging import logger, log_action
+from app.core.logging import log_action, logger
+from app.db.models import Tender
 from app.llm.client import llm_client
 from app.schemas.chat import ChatRequest, ChatResponse, Citation
 from app.services.retrieval import retrieve_relevant_context
-from app.db.models import Tender
 
 # Prompts are versioned as files under backend/prompts/, not pasted inline at
 # runtime — this mirrors app/services/extraction.py's load_extraction_prompt().
@@ -79,7 +79,7 @@ def answer_tender_question(db: Session, request: ChatRequest) -> ChatResponse:
 
     # Format context string
     formatted_context_list = []
-    citations: List[Citation] = []
+    citations: list[Citation] = []
 
     # Structured tender facts are authoritative for direct factual fields.
     if tender:
@@ -181,7 +181,7 @@ Timezone: {tender.timezone}
         logger.error(f"RAG LLM synthesis error: {e}")
         return ChatResponse(
             question=request.question,
-            answer=f"Unable to synthesize grounded answer due to LLM provider error ({str(e)}). Please ensure a valid LLM_API_KEY is configured.",
+            answer=f"Unable to synthesize grounded answer due to LLM provider error ({e!s}). Please ensure a valid LLM_API_KEY is configured.",
             citations=citations,
             model_used="error",
             usage={"model": "error", "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "is_estimated": True}

@@ -1,21 +1,28 @@
-import os
 import glob
-from datetime import datetime, timezone
-from typing import List, Optional
+import os
+from datetime import UTC, datetime, timezone
+from typing import Optional
+
 from sqlalchemy.orm import Session
 
-from app.core.logging import logger, log_action
+from app.core.logging import log_action, logger
 from app.db.database import SessionLocal
 from app.db.models import (
-    Tender, TenderEligibility, CompanyProfile, ScreeningResult,
-    Document, DocumentChunk, IngestionJob, IngestionStatusEnum
+    CompanyProfile,
+    Document,
+    DocumentChunk,
+    IngestionJob,
+    IngestionStatusEnum,
+    ScreeningResult,
+    Tender,
+    TenderEligibility,
 )
-from app.services.pdf_parser import parse_pdf_document
-from app.services.extraction import extract_tender_structured_data
-from app.services.screening import screen_tender_eligibility
+from app.schemas.profile import CompanyProfileBase
 from app.services.chunking import chunk_document_pages
 from app.services.embeddings import generate_embeddings_batch
-from app.schemas.profile import CompanyProfileBase
+from app.services.extraction import extract_tender_structured_data
+from app.services.pdf_parser import parse_pdf_document
+from app.services.screening import screen_tender_eligibility
 
 SEED_DATA_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "raw")
@@ -268,7 +275,7 @@ CATALOG = {
 }
 
 
-def run_ingestion_pipeline(job_id: str, custom_pdf_paths: Optional[List[str]] = None):
+def run_ingestion_pipeline(job_id: str, custom_pdf_paths: list[str] | None = None):
     db = SessionLocal()
     job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
 
@@ -279,7 +286,7 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: Optional[List[str]] = 
 
     try:
         job.status = IngestionStatusEnum.RUNNING
-        job.started_at = datetime.now(timezone.utc)
+        job.started_at = datetime.now(UTC)
         db.commit()
 
         log_action("INGESTION_STARTED", job_id=job_id, status="RUNNING")
@@ -312,7 +319,7 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: Optional[List[str]] = 
                     parent_meta = meta
                     if not meta["is_parent"]:
                         # Find parent entry in CATALOG
-                        for fname, mdata in CATALOG.items():
+                        for mdata in CATALOG.values():
                             if mdata.get("tender_ref") == tender_ref and mdata.get("is_parent"):
                                 parent_meta = mdata
                                 break
@@ -558,7 +565,7 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: Optional[List[str]] = 
                 db.commit()
 
         job.status = IngestionStatusEnum.COMPLETED
-        job.completed_at = datetime.now(timezone.utc)
+        job.completed_at = datetime.now(UTC)
         db.commit()
 
         log_action("INGESTION_COMPLETED", job_id=job_id, status="COMPLETED")
@@ -568,7 +575,7 @@ def run_ingestion_pipeline(job_id: str, custom_pdf_paths: Optional[List[str]] = 
         db.rollback()
         job.status = IngestionStatusEnum.FAILED
         job.error_message = str(pipe_err)
-        job.completed_at = datetime.now(timezone.utc)
+        job.completed_at = datetime.now(UTC)
         db.commit()
     finally:
         db.close()

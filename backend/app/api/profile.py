@@ -1,19 +1,24 @@
+from datetime import UTC, datetime, timezone
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
 
-from app.db.database import get_db
-from app.db.models import CompanyProfile, Tender, ScreeningResult
-from app.schemas.profile import CompanyProfileResponse, CompanyProfileUpdate, CompanyProfileBase
-from app.schemas.extraction import TenderEligibilitySchema, OtherRequirementItem
-from app.services.screening import screen_tender_eligibility
 from app.agent.pipeline import get_or_create_default_profile
+from app.db.database import get_db
+from app.db.models import CompanyProfile, ScreeningResult, Tender
+from app.schemas.extraction import OtherRequirementItem, TenderEligibilitySchema
+from app.schemas.profile import (
+    CompanyProfileBase,
+    CompanyProfileResponse,
+    CompanyProfileUpdate,
+)
+from app.services.screening import screen_tender_eligibility
 
 router = APIRouter(prefix="/api/profile", tags=["Company Profile"])
 
 
 @router.get("", response_model=CompanyProfileResponse)
-async def get_company_profile(db: Session = Depends(get_db)):
+async def get_company_profile(db: Session = Depends(get_db)):  # noqa: B008
     try:
         profile = get_or_create_default_profile(db)
         return CompanyProfileResponse(
@@ -33,12 +38,12 @@ async def get_company_profile(db: Session = Depends(get_db)):
             years_experience=7,
             past_contract_sizes=[75000000.0, 90000000.0],
             preferred_geographies=["Rajasthan", "Haryana", "Delhi", "Gujarat"],
-            updated_at=datetime.now(timezone.utc).isoformat()
+            updated_at=datetime.now(UTC).isoformat()
         )
 
 
 @router.put("", response_model=CompanyProfileResponse)
-async def update_company_profile(update_data: CompanyProfileUpdate, db: Session = Depends(get_db)):
+async def update_company_profile(update_data: CompanyProfileUpdate, db: Session = Depends(get_db)):  # noqa: B008
     profile = get_or_create_default_profile(db)
 
     if update_data.fleet_size is not None:

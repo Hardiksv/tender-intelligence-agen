@@ -1,10 +1,11 @@
 import hashlib
 import os
+from typing import Any
+
 import pymupdf  # PyMuPDF
-from typing import Dict, Any, List
 
 from app.core.exceptions import ParsingException
-from app.core.logging import logger, log_action
+from app.core.logging import log_action, logger
 from app.services.language import detect_document_language
 
 # Real PDF files always start with this magic header (spec: ISO 32000).
@@ -27,7 +28,7 @@ def _validate_is_real_pdf(file_path: str, file_bytes: bytes) -> None:
         )
 
 
-def parse_pdf_document(file_path: str) -> Dict[str, Any]:
+def parse_pdf_document(file_path: str) -> dict[str, Any]:
     """
     Parses a PDF document into page-aware text chunks, computes SHA-256 document hash,
     and runs language detection.
@@ -47,8 +48,8 @@ def parse_pdf_document(file_path: str) -> Dict[str, Any]:
 
         doc = pymupdf.open(file_path)
         page_count = len(doc)
-        pages_data: List[Dict[str, Any]] = []
-        full_text_parts: List[str] = []
+        pages_data: list[dict[str, Any]] = []
+        full_text_parts: list[str] = []
 
         for page_idx in range(page_count):
             page = doc.load_page(page_idx)
@@ -94,5 +95,5 @@ def parse_pdf_document(file_path: str) -> Dict[str, Any]:
     except ParsingException:
         raise
     except Exception as e:
-        logger.error(f"Error parsing PDF file {file_path}: {str(e)}")
-        raise ParsingException(f"Failed to parse PDF document: {str(e)}")
+        logger.error(f"Error parsing PDF file {file_path}: {e!s}")
+        raise ParsingException(f"Failed to parse PDF document: {e!s}")

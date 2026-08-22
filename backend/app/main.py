@@ -1,21 +1,23 @@
-from fastapi import FastAPI, Request, status, Depends, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-import uvicorn
+from contextlib import asynccontextmanager
 
+import uvicorn
+from fastapi import BackgroundTasks, Depends, FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
+
+from app.api import chat, ingestion, profile, screening, tenders
 from app.core.config import settings
-from app.core.logging import logger, log_action
 from app.core.exceptions import (
-    TenderAgentException,
     ConcurrentIngestionException,
     EmbeddingDimensionMismatchException,
-    LanguageUnsupportedException
+    LanguageUnsupportedException,
+    TenderAgentException,
 )
-
-from app.api import tenders, screening, profile, chat, ingestion
+from app.core.logging import log_action, logger
 from app.db.database import get_db
 
-from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -122,19 +124,19 @@ async def api_openapi():
     return JSONResponse(get_openapi(title=app.title, version=app.version, routes=app.routes))
 
 @app.get("/tenders", tags=["Tenders Alias"])
-async def list_tenders_alias(db = Depends(get_db)):
+async def list_tenders_alias(db = Depends(get_db)):  # noqa: B008
     return await tenders.list_tenders(db=db)
 
 @app.post("/ask", tags=["RAG Alias"])
-async def ask_alias(req: chat.ChatRequest, db = Depends(get_db)):
+async def ask_alias(req: chat.ChatRequest, db = Depends(get_db)):  # noqa: B008
     return await chat.chat_qna(req, db=db)
 
 @app.post("/search", tags=["Search Alias"])
-async def search_alias(req: chat.ChatRequest, db = Depends(get_db)):
+async def search_alias(req: chat.ChatRequest, db = Depends(get_db)):  # noqa: B008
     return await chat.chat_qna(req, db=db)
 
 @app.post("/ingest", tags=["Ingestion Alias"])
-async def ingest_alias(background_tasks: BackgroundTasks, db = Depends(get_db)):
+async def ingest_alias(background_tasks: BackgroundTasks, db = Depends(get_db)):  # noqa: B008
     return await ingestion.trigger_ingestion_run(background_tasks, db=db)
 
 

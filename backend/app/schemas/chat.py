@@ -1,5 +1,6 @@
+from typing import Any, Optional
+
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
 
 
 class Citation(BaseModel):
@@ -13,12 +14,12 @@ class Citation(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str = Field(description="Natural language question about stored tenders.")
-    tender_id: Optional[str] = Field(default=None, description="Optional tender ID filter to constrain Q&A context.")
+    tender_id: str | None = Field(default=None, description="Optional tender ID filter to constrain Q&A context.")
 
 
 class ChatResponse(BaseModel):
     question: str
     answer: str
-    citations: List[Citation]
+    citations: list[Citation]
     model_used: str
-    usage: Dict[str, Any]
+    usage: dict[str, Any]

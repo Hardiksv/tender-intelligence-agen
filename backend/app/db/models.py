@@ -1,12 +1,23 @@
-import uuid
 import enum
-from datetime import datetime, timezone
+import uuid
+from datetime import UTC, datetime, timezone
+
 from sqlalchemy import (
-    Column, String, Text, Integer, Numeric, DateTime, Enum as SQLEnum, ForeignKey, JSON
+    JSON,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
 )
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy.types import TypeDecorator, CHAR
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB as PG_JSONB
+from sqlalchemy.types import CHAR, TypeDecorator
+
 
 class GUID(TypeDecorator):
     """Platform-independent GUID type."""
@@ -57,8 +68,8 @@ class VectorType(TypeDecorator):
                 return dialect.type_descriptor(JSON)
         return dialect.type_descriptor(JSON)
 
-from app.db.database import Base
 from app.core.config import settings
+from app.db.database import Base
 
 
 class ScreeningVerdictEnum(str, enum.Enum):
@@ -119,8 +130,8 @@ class Tender(Base):
     # Provenance tracking for every extracted field
     extraction_provenance = Column(JSONType, nullable=True)
 
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
 
     # Relationships
     eligibility = relationship("TenderEligibility", back_populates="tender", uselist=False, cascade="all, delete-orphan")
@@ -155,7 +166,7 @@ class CompanyProfile(Base):
     years_experience = Column(Integer, nullable=False, default=0)
     past_contract_sizes = Column(JSONType, nullable=False, default=list)
     preferred_geographies = Column(JSONType, nullable=False, default=list)
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
 
 
 class ScreeningResult(Base):
@@ -166,7 +177,7 @@ class ScreeningResult(Base):
     verdict = Column(SQLEnum(ScreeningVerdictEnum), nullable=False)
     reasoning = Column(Text, nullable=False)
     criteria_results = Column(JSONType, nullable=False)
-    screened_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    screened_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
 
     tender = relationship("Tender", back_populates="screening_results")
 
@@ -182,7 +193,7 @@ class Document(Base):
     source_url = Column(String(1000), nullable=True)
     page_count = Column(Integer, nullable=False, default=0)
     document_hash = Column(String(64), nullable=False)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
 
     tender = relationship("Tender", back_populates="documents")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
@@ -216,4 +227,4 @@ class IngestionJob(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)

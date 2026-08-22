@@ -1,8 +1,9 @@
-from logging.config import fileConfig
 import os
 import sys
-from sqlalchemy import engine_from_config, pool, text
+from logging.config import fileConfig
+
 from alembic import context
+from sqlalchemy import engine_from_config, pool, text
 
 # Add backend directory to sys.path so app package is resolvable
 backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -11,9 +12,9 @@ if backend_dir not in sys.path:
 if os.getcwd() not in sys.path:
     sys.path.insert(0, os.getcwd())
 
+import app.db.models  # Ensure models are loaded
 from app.core.config import settings
 from app.db.database import Base
-import app.db.models  # Ensure models are loaded
 
 config = context.config
 

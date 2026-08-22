@@ -1,5 +1,6 @@
-from pydantic import BaseModel, ConfigDict
 from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
 
 
 class IngestionJobResponse(BaseModel):
@@ -8,9 +9,9 @@ class IngestionJobResponse(BaseModel):
     total_documents: int
     completed_documents: int
     failed_documents: int
-    current_document: Optional[str] = None
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
-    error_message: Optional[str] = None
+    current_document: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    error_message: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

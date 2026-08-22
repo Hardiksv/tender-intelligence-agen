@@ -1,9 +1,12 @@
 import os
+from collections.abc import Generator
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-from typing import Generator
+
 from app.core.config import settings
 from app.core.logging import logger
+
 
 def get_engine():
     # Attempt connecting to configured DATABASE_URL
@@ -16,7 +19,7 @@ def get_engine():
                 max_overflow=10,
                 connect_args={"connect_timeout": 3}
             )
-            with test_engine.connect() as conn:
+            with test_engine.connect():
                 logger.info("Connected successfully to PostgreSQL database.")
             return test_engine
     except Exception as e:

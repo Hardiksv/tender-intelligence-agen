@@ -1,24 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-from typing import Optional, List, Any
-from datetime import datetime, timezone
-
-from app.db.database import get_db
-from app.db.models import Tender, TenderEligibility
-from app.schemas.tender import TenderResponse, TenderListResponse, ScreeningSummaryResponse, TenderEligibilityResponse
-from app.core.logging import logger
+from datetime import UTC, datetime, timezone
+from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
-from app.services.screening import screen_tender_eligibility
-from app.schemas.profile import CompanyProfileBase
-from app.schemas.extraction import TenderEligibilitySchema, OtherRequirementItem
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from app.agent.pipeline import get_or_create_default_profile
+from app.core.logging import logger
+from app.db.database import get_db
+from app.db.models import Tender, TenderEligibility
+from app.schemas.extraction import OtherRequirementItem, TenderEligibilitySchema
+from app.schemas.profile import CompanyProfileBase
+from app.schemas.tender import (
+    ScreeningSummaryResponse,
+    TenderEligibilityResponse,
+    TenderListResponse,
+    TenderResponse,
+)
+from app.services.screening import screen_tender_eligibility
 
 router = APIRouter(prefix="/api/tenders", tags=["Tenders"])
 
 
-def _format_dt(dt: Optional[Any], tz_str: str = "Asia/Kolkata") -> Optional[str]:
+def _format_dt(dt: Any | None, tz_str: str = "Asia/Kolkata") -> str | None:
     if dt is None:
         return None
     if isinstance(dt, str):
@@ -28,27 +33,27 @@ def _format_dt(dt: Optional[Any], tz_str: str = "Asia/Kolkata") -> Optional[str]
             try:
                 dt = dt.replace(tzinfo=ZoneInfo(tz_str))
             except Exception:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
         return dt.isoformat()
     return str(dt)
 
 
 def format_tender_response(t: Tender) -> TenderResponse:
-    now_dt = datetime.now(timezone.utc)
+    now_dt = datetime.now(UTC)
     raw_deadline = getattr(t, "submission_deadline", now_dt)
     if isinstance(raw_deadline, datetime):
         if raw_deadline.tzinfo is None:
             try:
                 deadline_dt = raw_deadline.replace(tzinfo=ZoneInfo(getattr(t, "timezone", "Asia/Kolkata")))
             except Exception:
-                deadline_dt = raw_deadline.replace(tzinfo=timezone.utc)
+                deadline_dt = raw_deadline.replace(tzinfo=UTC)
         else:
             deadline_dt = raw_deadline
     elif isinstance(raw_deadline, str):
         try:
             deadline_dt = datetime.fromisoformat(raw_deadline)
             if deadline_dt.tzinfo is None:
-                deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
+                deadline_dt = deadline_dt.replace(tzinfo=UTC)
         except Exception:
             deadline_dt = now_dt
     else:
@@ -63,7 +68,7 @@ def format_tender_response(t: Tender) -> TenderResponse:
         try:
             s_list = list(t.screening_results)
             if s_list:
-                latest_s = sorted(s_list, key=lambda x: getattr(x, "screened_at", now_dt) or now_dt, reverse=True)[0]
+                latest_s = max(s_list, key=lambda x: getattr(x, "screened_at", now_dt) or now_dt)
                 raw_verdict = getattr(latest_s, "verdict", "REVIEW")
                 v_str = raw_verdict.value if hasattr(raw_verdict, "value") else str(raw_verdict)
                 raw_criteria = getattr(latest_s, "criteria_results", []) or []
@@ -134,11 +139,11 @@ def format_tender_response(t: Tender) -> TenderResponse:
 
 @router.get("", response_model=TenderListResponse)
 async def list_tenders(
-    state: Optional[str] = Query(default=None, description="Filter tenders by state"),
-    verdict: Optional[str] = Query(default=None, description="Filter tenders by GO / NO-GO / REVIEW verdict"),
-    search: Optional[str] = Query(default=None, description="Search term in title or authority"),
-    city: Optional[str] = Query(default=None, description="Filter tenders by city"),
-    db: Session = Depends(get_db)
+    state: str | None = Query(default=None, description="Filter tenders by state"),
+    verdict: str | None = Query(default=None, description="Filter tenders by GO / NO-GO / REVIEW verdict"),
+    search: str | None = Query(default=None, description="Search term in title or authority"),
+    city: str | None = Query(default=None, description="Filter tenders by city"),
+    db: Session = Depends(get_db)  # noqa: B008
 ):
     state_val = state if isinstance(state, str) else None
     verdict_val = verdict if isinstance(verdict, str) else None
@@ -189,13 +194,11 @@ async def list_tenders(
     # engine (services/screening.py) against the company profile. No hardcoded
     # verdicts or fabricated numbers — the screening logic here is exactly the
     # same code path as post-ingestion DB-backed screening.
-    from app.agent.pipeline import CATALOG, get_or_create_default_profile
-    from app.services.screening import screen_tender_eligibility
-    from app.schemas.profile import CompanyProfileBase
-    from app.schemas.extraction import TenderEligibilitySchema, OtherRequirementItem
-    from datetime import datetime, timezone
-    import uuid
     import hashlib
+    import uuid
+    from datetime import datetime
+
+    from app.agent.pipeline import CATALOG
 
     # Build company profile (same defaults as DB-backed screening)
     try:
@@ -217,7 +220,7 @@ async def list_tenders(
         )
 
     filtered = []
-    now_dt = datetime.now(timezone.utc)
+    now_dt = datetime.now(UTC)
 
     for fname, meta in CATALOG.items():
         if not meta.get("is_parent"):
@@ -229,7 +232,7 @@ async def list_tenders(
             deadline_dt = now_dt
 
         if deadline_dt.tzinfo is None:
-            deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
+            deadline_dt = deadline_dt.replace(tzinfo=UTC)
 
         time_diff = deadline_dt - now_dt
         days_rem = max(0, time_diff.days)
@@ -338,7 +341,7 @@ async def list_tenders(
 
 
 @router.get("/daily-digest")
-async def get_daily_digest(db: Session = Depends(get_db)):
+async def get_daily_digest(db: Session = Depends(get_db)):  # noqa: B008
     tenders = db.query(Tender).order_by(Tender.submission_deadline.asc()).all()
     formatted = [format_tender_response(t) for t in tenders]
 
@@ -347,7 +350,7 @@ async def get_daily_digest(db: Session = Depends(get_db)):
 
     total_buses = sum((t.latest_bus_quantity or t.original_bus_quantity or 0) for t in tenders)
 
-    digest_text = f"# Tender Intelligence Daily Digest ({datetime.now(timezone.utc).strftime('%d %b %Y')})\n\n"
+    digest_text = f"# Tender Intelligence Daily Digest ({datetime.now(UTC).strftime('%d %b %Y')})\n\n"
     digest_text += f"**Active Tenders Tracked:** {len(tenders)} opportunities | **Total Scope:** {total_buses:,} buses\n"
     digest_text += f"**Priority Actions:** {len(go_tenders)} GO | {len(review_tenders)} REVIEW\n\n"
 
@@ -365,7 +368,7 @@ async def get_daily_digest(db: Session = Depends(get_db)):
             digest_text += f"- **{t.title[:60]}...**\n  - *Authority:* {t.issuing_authority}\n  - *Reasoning:* {t.screening.reasoning[:100]}...\n\n"
 
     return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "total_active_tenders": len(tenders),
         "go_count": len(go_tenders),
         "review_count": len(review_tenders),
@@ -374,7 +377,7 @@ async def get_daily_digest(db: Session = Depends(get_db)):
 
 
 @router.get("/{tender_id}", response_model=TenderResponse)
-async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
+async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):  # noqa: B008
     t = None
     try:
         t = db.query(Tender).filter(Tender.id == tender_id).first()
@@ -389,11 +392,12 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
             logger.warning(f"Failed formatting database tender {tender_id}: {e}")
 
     # Serverless Catalog Fallback
-    from app.agent.pipeline import CATALOG
-    import uuid
     import hashlib
+    import uuid
 
-    now_dt = datetime.now(timezone.utc)
+    from app.agent.pipeline import CATALOG
+
+    now_dt = datetime.now(UTC)
     for fname, meta in CATALOG.items():
         if not meta.get("is_parent"):
             continue
@@ -406,7 +410,7 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
                 deadline_dt = now_dt
 
             if deadline_dt.tzinfo is None:
-                deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
+                deadline_dt = deadline_dt.replace(tzinfo=UTC)
 
             time_diff = deadline_dt - now_dt
             days_rem = max(0, time_diff.days)
@@ -414,10 +418,13 @@ async def get_tender_by_id(tender_id: str, db: Session = Depends(get_db)):
             doc_hash = hashlib.sha256(fname.encode("utf-8")).hexdigest()
 
             # Build profile and eligibility, then run real screening engine
-            from app.services.screening import screen_tender_eligibility
-            from app.schemas.profile import CompanyProfileBase
-            from app.schemas.extraction import TenderEligibilitySchema, OtherRequirementItem
             from app.agent.pipeline import get_or_create_default_profile
+            from app.schemas.extraction import (
+                OtherRequirementItem,
+                TenderEligibilitySchema,
+            )
+            from app.schemas.profile import CompanyProfileBase
+            from app.services.screening import screen_tender_eligibility
 
             try:
                 profile_db = get_or_create_default_profile(db)

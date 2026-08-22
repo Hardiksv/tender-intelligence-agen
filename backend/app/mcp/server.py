@@ -5,8 +5,8 @@ Reuses all existing application services without duplicating logic.
 """
 import asyncio
 import json
-import sys
 import os
+import sys
 
 # Add backend root directory to sys.path
 backend_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,11 +15,11 @@ if backend_root not in sys.path:
 
 from mcp.server.fastmcp import FastMCP
 
+from app.core.logging import log_action
 from app.db.database import SessionLocal
 from app.db.models import Tender
 from app.schemas.chat import ChatRequest
 from app.services.rag import answer_tender_question
-from app.core.logging import log_action
 
 server = FastMCP("tender-intelligence-agent")
 
@@ -48,13 +48,13 @@ async def search_tenders(
             if city and t.city and city.lower() not in t.city.lower():
                 continue
             if verdict and t.screening_results:
-                latest = sorted(t.screening_results, key=lambda x: x.screened_at, reverse=True)[0]
+                latest = max(t.screening_results, key=lambda x: x.screened_at)
                 if latest.verdict != verdict.upper():
                     continue
 
             v_val = "PENDING"
             if t.screening_results:
-                latest = sorted(t.screening_results, key=lambda x: x.screened_at, reverse=True)[0]
+                latest = max(t.screening_results, key=lambda x: x.screened_at)
                 v_val = latest.verdict
 
             results.append({
@@ -101,7 +101,7 @@ async def get_tender(tender_id: str) -> str:
 
         screening_data = None
         if t.screening_results:
-            latest = sorted(t.screening_results, key=lambda x: x.screened_at, reverse=True)[0]
+            latest = max(t.screening_results, key=lambda x: x.screened_at)
             screening_data = {
                 "verdict": latest.verdict,
                 "reasoning": latest.reasoning,

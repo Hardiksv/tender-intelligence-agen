@@ -1,10 +1,14 @@
-from datetime import datetime, timezone
-from typing import List
+from datetime import UTC, datetime, timezone
 
-from app.schemas.profile import CompanyProfileBase
-from app.schemas.extraction import TenderEligibilitySchema
-from app.schemas.screening import CriterionDetail, CriterionVerdict, FinalVerdict, ScreeningResultSchema
 from app.core.logging import log_action
+from app.schemas.extraction import TenderEligibilitySchema
+from app.schemas.profile import CompanyProfileBase
+from app.schemas.screening import (
+    CriterionDetail,
+    CriterionVerdict,
+    FinalVerdict,
+    ScreeningResultSchema,
+)
 
 
 def screen_tender_eligibility(
@@ -18,7 +22,7 @@ def screen_tender_eligibility(
     Deterministically screens tender eligibility against company profile using pure Python comparisons.
     Enforces strict verdict precedence: NO-GO > REVIEW > GO.
     """
-    criteria: List[CriterionDetail] = []
+    criteria: list[CriterionDetail] = []
 
     # 1. Fleet Size Check (Mandatory)
     if eligibility.minimum_fleet_size is not None and eligibility.minimum_fleet_size > 0:
@@ -162,7 +166,7 @@ def screen_tender_eligibility(
         verdict=final_verdict,
         reasoning=summary,
         criteria_results=criteria,
-        screened_at=datetime.now(timezone.utc).isoformat()
+        screened_at=datetime.now(UTC).isoformat()
     )
 
     log_action(

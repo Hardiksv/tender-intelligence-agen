@@ -9,5 +9,5 @@ router = APIRouter(prefix="/api/chat", tags=["RAG Chat"])
 
 
 @router.post("", response_model=ChatResponse)
-async def chat_qna(request: ChatRequest, db: Session = Depends(get_db)):
+async def chat_qna(request: ChatRequest, db: Session = Depends(get_db)):  # noqa: B008
     return answer_tender_question(db, request)

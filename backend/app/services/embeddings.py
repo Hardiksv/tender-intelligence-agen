@@ -1,10 +1,14 @@
 import json
 import urllib.request
-from typing import List
+
 import litellm
+
 from app.core.config import settings
-from app.core.logging import logger, log_action
-from app.core.exceptions import EmbeddingDimensionMismatchException, EmbeddingGenerationException
+from app.core.exceptions import (
+    EmbeddingDimensionMismatchException,
+    EmbeddingGenerationException,
+)
+from app.core.logging import log_action, logger
 
 # Singleton SentenceTransformer instance for local embedding fallback
 _sentence_model = None
@@ -33,7 +37,7 @@ def _get_sentence_transformer():
 
 
 
-def _call_jina_api(texts: List[str], task_type: str = "retrieval.query") -> List[List[float]]:
+def _call_jina_api(texts: list[str], task_type: str = "retrieval.query") -> list[list[float]]:
     """Calls Jina AI Embeddings API (v3/v5) with 768 dimensions constraint."""
     api_key = getattr(settings, "EMBEDDING_API_KEY", "") or settings.LLM_API_KEY
     if not api_key or not api_key.startswith("jina_"):
@@ -64,7 +68,7 @@ def _call_jina_api(texts: List[str], task_type: str = "retrieval.query") -> List
         return embeddings
 
 
-def generate_embedding(text: str) -> List[float]:
+def generate_embedding(text: str) -> list[float]:
     """
     Generates embedding vector for input text supporting Jina AI, Gemini,
     Groq, and local SentenceTransformer models with dimension validation.
@@ -81,7 +85,7 @@ def generate_embedding(text: str) -> List[float]:
 
     vector = None
     model_name = settings.EMBEDDING_MODEL
-    errors: List[str] = []
+    errors: list[str] = []
 
     # 1. Primary Jina AI Embeddings Provider
     if "jina" in model_name or (hasattr(settings, "EMBEDDING_API_KEY") and settings.EMBEDDING_API_KEY.startswith("jina_")):
@@ -144,7 +148,7 @@ def generate_embedding(text: str) -> List[float]:
     return vector
 
 
-def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
+def generate_embeddings_batch(texts: list[str]) -> list[list[float]]:
     """
     Generates embedding vectors for a batch of text chunks with explicit
     dimensions=settings.EMBEDDING_DIMENSION constraint.
@@ -157,7 +161,7 @@ def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
 
     vectors = []
     model_name = settings.EMBEDDING_MODEL
-    errors: List[str] = []
+    errors: list[str] = []
 
     # 1. Primary Jina AI Embeddings Batch Provider
     if "jina" in model_name or (hasattr(settings, "EMBEDDING_API_KEY") and settings.EMBEDDING_API_KEY.startswith("jina_")):

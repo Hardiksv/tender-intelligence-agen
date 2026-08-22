@@ -1,8 +1,8 @@
 import re
-from typing import Optional, Tuple, Any
+from typing import Any, Optional
 
 
-def normalize_currency_to_inr(raw_value: str) -> Tuple[Optional[float], str]:
+def normalize_currency_to_inr(raw_value: str) -> tuple[float | None, str]:
     """
     Normalizes Indian financial text (Crore, Lakh, Rs, INR) to exact float INR numbers.
     Returns (normalized_float_inr, original_text).
@@ -43,7 +43,7 @@ def normalize_currency_to_inr(raw_value: str) -> Tuple[Optional[float], str]:
     return None, original_text
 
 
-def normalize_fleet_size(raw_value: Any) -> Optional[int]:
+def normalize_fleet_size(raw_value: Any) -> int | None:
     """Extracts integer fleet size from text or number."""
     if raw_value is None:
         return None

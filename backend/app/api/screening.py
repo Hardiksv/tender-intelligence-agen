@@ -1,20 +1,21 @@
+from datetime import UTC, datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
 
-from app.db.database import get_db
-from app.db.models import Tender, ScreeningResult
-from app.schemas.screening import ScreeningResultSchema, FinalVerdict
-from app.schemas.profile import CompanyProfileBase
-from app.schemas.extraction import TenderEligibilitySchema, OtherRequirementItem
-from app.services.screening import screen_tender_eligibility
 from app.agent.pipeline import get_or_create_default_profile
+from app.db.database import get_db
+from app.db.models import ScreeningResult, Tender
+from app.schemas.extraction import OtherRequirementItem, TenderEligibilitySchema
+from app.schemas.profile import CompanyProfileBase
+from app.schemas.screening import FinalVerdict, ScreeningResultSchema
+from app.services.screening import screen_tender_eligibility
 
 router = APIRouter(prefix="/api/tenders", tags=["Screening"])
 
 
 @router.get("/{tender_id}/screening", response_model=ScreeningResultSchema)
-async def get_tender_screening(tender_id: str, db: Session = Depends(get_db)):
+async def get_tender_screening(tender_id: str, db: Session = Depends(get_db)):  # noqa: B008
     t = None
     try:
         t = db.query(Tender).filter(Tender.id == tender_id).first()
@@ -33,13 +34,14 @@ async def get_tender_screening(tender_id: str, db: Session = Depends(get_db)):
             )
 
     # Serverless fallback
-    from app.agent.pipeline import CATALOG
-    from app.services.screening import screen_tender_eligibility
-    from app.schemas.profile import CompanyProfileBase
-    from app.schemas.extraction import TenderEligibilitySchema
     import uuid
 
-    for fname, meta in CATALOG.items():
+    from app.agent.pipeline import CATALOG
+    from app.schemas.extraction import TenderEligibilitySchema
+    from app.schemas.profile import CompanyProfileBase
+    from app.services.screening import screen_tender_eligibility
+
+    for meta in CATALOG.values():
         if not meta.get("is_parent"):
             continue
         gen_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, meta["tender_ref"]))
@@ -71,14 +73,14 @@ async def get_tender_screening(tender_id: str, db: Session = Depends(get_db)):
                 verdict=s_res.verdict,
                 reasoning=s_res.reasoning,
                 criteria_results=[c.model_dump() for c in s_res.criteria_results],
-                screened_at=datetime.now(timezone.utc).isoformat()
+                screened_at=datetime.now(UTC).isoformat()
             )
 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tender not found")
 
 
 @router.post("/{tender_id}/screen", response_model=ScreeningResultSchema)
-async def run_tender_screening(tender_id: str, db: Session = Depends(get_db)):
+async def run_tender_screening(tender_id: str, db: Session = Depends(get_db)):  # noqa: B008
     t = db.query(Tender).filter(Tender.id == tender_id).first()
     if not t or not t.eligibility:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tender or eligibility details not found")

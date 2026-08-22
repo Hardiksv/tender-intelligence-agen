@@ -1,7 +1,8 @@
-import logging
 import json
+import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
+
 from app.core.config import settings
 
 # Setup standard logger
@@ -22,18 +23,18 @@ if not logger.handlers:
 
 def log_action(
     event_type: str,
-    tender_id: str = None,
-    document_id: str = None,
-    job_id: str = None,
+    tender_id: str | None = None,
+    document_id: str | None = None,
+    job_id: str | None = None,
     status: str = "SUCCESS",
-    details: dict = None,
-    extra_meta: dict = None
+    details: dict | None = None,
+    extra_meta: dict | None = None
 ):
     """
     Structured action logging for audit and defense call evaluation.
     """
     log_payload = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "event_type": event_type,
         "tender_id": str(tender_id) if tender_id else None,
         "document_id": str(document_id) if document_id else None,

@@ -1,10 +1,10 @@
 import os
-from datetime import datetime
-from typing import Dict, Any
+from datetime import datetime, timezone
+from typing import Any
 
-from app.core.logging import logger, log_action
+from app.core.logging import log_action, logger
 from app.llm.client import llm_client
-from app.schemas.extraction import TenderExtractionSchema, OtherRequirementItem
+from app.schemas.extraction import OtherRequirementItem, TenderExtractionSchema
 from app.services.normalization import normalize_currency_to_inr
 
 PROMPT_PATH = os.path.join(
@@ -21,7 +21,7 @@ def load_extraction_prompt() -> str:
     return "Extract tender title, issuing authority, city, state, deadline, EMD, fees, scope, and eligibility requirements from document text."
 
 
-def extract_tender_structured_data(full_text: str, document_name: str = "") -> Dict[str, Any]:
+def extract_tender_structured_data(full_text: str, document_name: str = "") -> dict[str, Any]:
     """
     Extracts structured tender details using LiteLLM structured output schema
     and applies currency/metric normalization.
@@ -70,7 +70,7 @@ def extract_tender_structured_data(full_text: str, document_name: str = "") -> D
         return heuristic_fallback_extraction(full_text, document_name)
 
 
-def heuristic_fallback_extraction(full_text: str, document_name: str) -> Dict[str, Any]:
+def heuristic_fallback_extraction(full_text: str, document_name: str) -> dict[str, Any]:
     """
     Fallback heuristic extractor used only when every LLM provider fails.
 
@@ -119,7 +119,7 @@ def heuristic_fallback_extraction(full_text: str, document_name: str) -> Dict[st
     dead_match = re.search(r'(\d{2}-[A-Za-z]+-20\d{2})', full_text)
     if dead_match:
         try:
-            dt = datetime.strptime(dead_match.group(1), "%d-%B-%Y")
+            dt = datetime.strptime(dead_match.group(1), "%d-%B-%Y").replace(tzinfo=timezone.utc)
             deadline = dt.strftime("%Y-%m-%dT15:00:00+05:30")
         except Exception:
             logger.warning(
@@ -160,7 +160,7 @@ def heuristic_fallback_extraction(full_text: str, document_name: str) -> Dict[st
         exp = int(exp_match.group(1))
 
     scope_note = (
-        f"Operation and maintenance of commercial bus operations fleet"
+        "Operation and maintenance of commercial bus operations fleet"
         + (f" in {city}, {state}." if city and state else " (location not confirmed — automated extraction failed).")
     )
 
