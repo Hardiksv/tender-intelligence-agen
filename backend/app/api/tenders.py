@@ -61,15 +61,28 @@ def format_tender_response(t: Tender) -> TenderResponse:
     screening_summary = None
     if getattr(t, "screening_results", None):
         try:
-            latest_s = sorted(t.screening_results, key=lambda x: x.screened_at, reverse=True)[0]
-            screening_summary = ScreeningSummaryResponse(
-                verdict=latest_s.verdict,
-                reasoning=latest_s.reasoning,
-                criteria_results=latest_s.criteria_results or [],
-                screened_at=_format_dt(latest_s.screened_at) or now_dt.isoformat()
-            )
-        except Exception:
-            pass
+            s_list = list(t.screening_results)
+            if s_list:
+                latest_s = sorted(s_list, key=lambda x: getattr(x, "screened_at", now_dt) or now_dt, reverse=True)[0]
+                raw_verdict = getattr(latest_s, "verdict", "REVIEW")
+                v_str = raw_verdict.value if hasattr(raw_verdict, "value") else str(raw_verdict)
+                raw_criteria = getattr(latest_s, "criteria_results", []) or []
+                clean_criteria = []
+                for c in raw_criteria:
+                    if hasattr(c, "model_dump"):
+                        clean_criteria.append(c.model_dump())
+                    elif isinstance(c, dict):
+                        clean_criteria.append(c)
+                    else:
+                        clean_criteria.append({"detail": str(c)})
+                screening_summary = ScreeningSummaryResponse(
+                    verdict=v_str,
+                    reasoning=getattr(latest_s, "reasoning", "") or "",
+                    criteria_results=clean_criteria,
+                    screened_at=_format_dt(getattr(latest_s, "screened_at", now_dt)) or now_dt.isoformat()
+                )
+        except Exception as e:
+            logger.warning(f"Error formatting screening summary: {e}")
 
     eligibility_summary = None
     if getattr(t, "eligibility", None):
@@ -83,8 +96,8 @@ def format_tender_response(t: Tender) -> TenderResponse:
                 required_geographies=getattr(e, "required_geographies", None),
                 other_requirements=getattr(e, "other_requirements", None)
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Error formatting eligibility summary: {e}")
 
     return TenderResponse(
         id=str(t.id),
@@ -143,45 +156,31 @@ async def list_tenders(
     if tenders:
         try:
             filtered = []
-
             for t in tenders:
-                resp = format_tender_response(t)
-                # Dashboard/API default should only expose active tenders.
-                # Expired tenders remain accessible through the individual tender endpoint.
-                # if resp.is_expired:
-                #     continue
-
-                if state_val and (
-                    not t.state or state_val.lower() not in t.state.lower()
-                 ):
+                try:
+                    resp = format_tender_response(t)
+                except Exception as fe:
+                    logger.warning(f"Failed to format individual tender {getattr(t, 'id', 'unknown')}: {fe}")
                     continue
 
-                if city_val and (
-                    not t.city or city_val.lower() not in t.city.lower()
-                ):
+                if state_val and (not t.state or state_val.lower() not in t.state.lower()):
                     continue
-                if verdict_val and (
-                    not resp.screening
-                    or resp.screening.verdict.upper() != verdict_val.upper()
-                 ):
+                if city_val and (not t.city or city_val.lower() not in t.city.lower()):
                     continue
-
+                if verdict_val and (not resp.screening or resp.screening.verdict.upper() != verdict_val.upper()):
+                    continue
                 if search_val:
                     search_lower = search_val.lower()
-
-                    if (
-                        search_lower not in t.title.lower()
-                        and search_lower not in t.issuing_authority.lower()
-                    ):
+                    if search_lower not in t.title.lower() and search_lower not in t.issuing_authority.lower():
                         continue
 
                 filtered.append(resp)
 
-            return TenderListResponse(
-                total=len(filtered),
-                tenders=filtered
-            )
-
+            if filtered:
+                return TenderListResponse(
+                    total=len(filtered),
+                    tenders=filtered
+                )
         except Exception as e:
             logger.warning(f"Error formatting database tenders: {e}")
 
