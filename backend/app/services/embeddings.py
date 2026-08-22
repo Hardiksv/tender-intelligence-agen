@@ -13,7 +13,15 @@ _sentence_model = None
 def _get_sentence_transformer():
     global _sentence_model
     if _sentence_model is None:
-        from sentence_transformers import SentenceTransformer
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError:
+            raise ImportError(
+                "sentence-transformers is not installed. "
+                "It is excluded from requirements.txt to keep the Vercel deployment "
+                "within the 250 MB bundle limit. Install it locally with: "
+                "pip install sentence-transformers>=2.7.0"
+            )
         fallback_name = (
             settings.EMBEDDING_MODEL
             if not settings.EMBEDDING_MODEL.startswith(("gemini", "groq", "jina", "text-embedding", "models/"))
@@ -22,6 +30,7 @@ def _get_sentence_transformer():
         logger.info(f"Initializing local embedding model: {fallback_name}")
         _sentence_model = SentenceTransformer(fallback_name)
     return _sentence_model
+
 
 
 def _call_jina_api(texts: List[str], task_type: str = "retrieval.query") -> List[List[float]]:

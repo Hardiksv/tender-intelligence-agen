@@ -52,6 +52,13 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r backend/requirements.txt
 
+      - name: Install test-only dependencies
+        run: pip install "sentence-transformers>=2.7.0"
+        # sentence-transformers pulls torch (~1 GB) which exceeds Vercel's
+        # serverless bundle limit (~250 MB). It is intentionally excluded from
+        # requirements.txt so prod deployment stays within limits. Installing
+        # it here gives CI the local embedding fallback without affecting prod.
+
       - name: Run Alembic migrations
         working-directory: backend
         run: alembic upgrade head
